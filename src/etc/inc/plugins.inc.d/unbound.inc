@@ -702,8 +702,14 @@ function unbound_add_host_entries()
             }
         }
     }
-
-    file_put_contents('/var/unbound/host_entries.conf', $unbound_entries);
+    $unbound_entries_cur = file_get_contents('/var/unbound/host_entries.conf');
+    if (strcmp($unbound_entries, $unbound_entries_cur) == 0) {
+        echo 'Unbound hosts entries did not change. No need to reload';
+        return false;
+    } else {
+        file_put_contents('/var/unbound/host_entries.conf', $unbound_entries);
+        return true;
+    }
 }
 
 function unbound_acls_subnets()
@@ -788,7 +794,9 @@ function unbound_hosts_generate()
         return;
     }
 
-    unbound_add_host_entries();
+    if (!unbound_add_host_entries()) {
+        return;
+    }
 
     killbypid('/var/run/unbound.pid', 'HUP');
 }
