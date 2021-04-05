@@ -710,14 +710,10 @@
                       <tfoot>
                         <tr>
                             <td colspan="4">
-
                                 <label>
                                     <input id="filter_or_type" type="checkbox">
                                     {{ lang._('Select any of given criteria (or)') }}
                                 </label>
-
-
-
                             </td>
                         </tr>
                       </tfoot>
