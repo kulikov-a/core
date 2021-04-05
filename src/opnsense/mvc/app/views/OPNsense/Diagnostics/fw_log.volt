@@ -494,7 +494,7 @@
          * @param items list of lexical expressions
          * @param operator enable or disable global OR operator
          */
-         function set_selection(items, operator)
+        function set_selection(items, operator)
         {
             // remove old selection
             $("#filters > span.badge").click();
