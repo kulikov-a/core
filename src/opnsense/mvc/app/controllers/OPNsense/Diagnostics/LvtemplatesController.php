@@ -1,7 +1,7 @@
 <?php
 
 /**
- *    Copyright (C) 2017 Deciso B.V.
+ *    Copyright (C) 2021 Deciso B.V.
  *
  *    All rights reserved.
  *
@@ -40,10 +40,6 @@ class LvtemplatesController extends IndexController
     /**
      * firewall live view filters
      */
-    public function filtersAction()
-    {
-        $this->view->pick('OPNsense/Diagnostics/fsets');
-    }
 
     public function indexAction()
     {
