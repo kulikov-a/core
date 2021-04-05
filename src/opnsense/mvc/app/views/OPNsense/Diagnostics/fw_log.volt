@@ -356,12 +356,12 @@
 
         // templates actions
         $("#templates").change(function () {
-            if ($('button.templates').is(':visible')) {
-                //choose template to apply or delete
+            if ($('#templ_save_start').is(':visible')) {
+                //apply chosen template
                 let t_data = $(this).find('option:selected').data('template') ? $(this).find('option:selected').data('template') : {'filters': "0", 'or': "0"};
                 set_selection(t_data.filters.split(','), t_data.or);
             } else {
-                //choose template to modify or create new one
+                //choose template to modify or create new one. Show Name input if New option clicked
                 if ($('#templates').val() === "00001") {
                     $('#templates').selectpicker('hide');
                     $('#templ_name').show().focus();
@@ -599,8 +599,8 @@
 
         /**
          * fetch templates from config
-         * @param opt select value to make :selected
-         * @param parse_url flag to parse url params on first page load
+         * @param opt select value to make :selected and apply
+         * @param parse_url flag to parse and apply url params on page load
          */
         function fetchTemplates(opt, parse_url) {
             opt = opt || "00000";
