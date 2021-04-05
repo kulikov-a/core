@@ -1,6 +1,6 @@
 {#
  #
- # Copyright (c) 2014-2016 Deciso B.V.
+ # Copyright (c) 2014-2021 Deciso B.V.
  # All rights reserved.
  #
  # Redistribution and use in source and binary forms, with or without modification,
@@ -727,14 +727,11 @@
                             <button type="button" class="btn btn-default templ_save" title="Cancel" id="templ_save_cancel"><span
                                     class="fa fa-times"></span></button>
                             <div style="display: inline-block;vertical-align: top;"><select id="templates" class="selectpicker" title="Choose template" data-width="200"></select>
-                                <input type="text" id="templ_name" placeholder="Template name"
-                                    style="width:200px;vertical-align:middle;display:none;">
+                                <input type="text" id="templ_name" placeholder="Template name" style="width:200px;vertical-align:middle;display:none;">
                             </div>
-                            <button type="button" class="btn btn-default templ_save" title="Save template" id="templ_save_apply"><span
-                                    class="fa fa-save"></span></button>
+                            <button type="button" class="btn btn-default templ_save" title="Save template" id="templ_save_apply"><span class="fa fa-save"></span></button>
                         <span class="templates">
-                            <button id="template_delete" type="button" class="btn btn-default" title="Deleted selected template"
-                                if="templ_del">
+                            <button id="template_delete" type="button" class="btn btn-default" title="Deleted selected template" if="templ_del">
                                 <span class="fa fa-trash"></span>
                             </button>
                         </span>
