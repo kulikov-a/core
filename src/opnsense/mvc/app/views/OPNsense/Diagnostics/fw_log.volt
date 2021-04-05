@@ -406,7 +406,6 @@
             } else if (e.keyCode === 27) {
                 $('#templ_name').val("").hide();
                 $('#templates').val('').selectpicker('refresh').selectpicker('show');
-
             }
         });
 
