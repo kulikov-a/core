@@ -201,8 +201,12 @@
                     $('#templates').append(template.uuid == opt ? $('<option/>', {value:template.uuid, text:template.name, selected: "selected" }).data('template', template) : $('<option/>', {value:template.uuid, text:template.name }).data('template', template));
                 });
                 $('#templates').selectpicker('refresh');
-                $('.badge').click();
-                $("#templates").change();
+                if (window.location.href.indexOf('?') == -1) {
+                    $('.badge').click();
+                    $("#templates").change();
+                } else {
+                    history.replaceState(null, "", location.href.split("?")[0]);
+                }
             });
         }
 
