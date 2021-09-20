@@ -141,12 +141,31 @@ if __name__ == '__main__':
                     'blocklist download %(uri)s (lines: %(lines)d exclude: %(skip)d block: %(blocklist)d)' % file_stats
                 )
 
+        # fetch configured DNS response type
+        localdata = False
+        localzone = None
+    
+        if cnf.has_section('response'):
+            localdata = bool(cnf.getint('response', 'localdata')) if cnf.has_option('response', 'localdata') else False
+            localzone = cnf.get('response', 'localzone').strip() if cnf.has_option('response', 'localzone') else None
+            if localzone == '__default__':
+                localzone = None
+
     # write out results
     with open("/usr/local/etc/unbound.opnsense.d/dnsbl.conf", 'w') as unbound_outf:
         if blocklist_items:
             unbound_outf.write('server:\n')
             for entry in blocklist_items:
-                unbound_outf.write("local-data: \"%s A 0.0.0.0\"\n" % entry)
+                if localzone:
+                    # advanced DNSBL response
+                    unbound_outf.write("local-zone: \"%s\" %s\n" % (entry, localzone))
+                    if localdata:
+                        # Static null DNSBL response records
+                        unbound_outf.write("local-data: \"%s A 0.0.0.0\"\n" % entry)
+                        unbound_outf.write("local-data: \"%s AAAA ::\"\n" % entry)
+                else:
+                    # legacy OPNsense behavior
+                    unbound_outf.write("local-data: \"%s A 0.0.0.0\"\n" % entry)
 
     syslog.syslog(syslog.LOG_NOTICE, "blocklist download done in %0.2f seconds (%d records)" % (
         time.time() - startup_time, len(blocklist_items)

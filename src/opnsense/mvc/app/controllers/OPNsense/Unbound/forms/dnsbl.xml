@@ -12,6 +12,28 @@
         <help>Select which kind of DNSBL you want to use.</help>
     </field>
     <field>
+        <id>unbound.dnsbl.localzone</id>
+        <label>DNSBL Response Type</label>
+        <type>dropdown</type>
+        <advanced>true</advanced>
+        <help><![CDATA[Select the desired DNSBL response type for blocklist matches. See 'local-zone' in unbound.conf(5) for full details.
+          "Always" types always return the indicated response.
+          "Inform" types generate additional logging that can be used to monitor blocklist matches.
+          "Redirect" types will return NXDOMAIN if no local records are configured.
+          Certain types support returning static records of the default response. (See the Null Response option).
+          Types that match subdomains can improve DNSBL coverage but may require whitelisting some subdomains.
+        ]]></help>
+    </field>
+    <field>
+        <id>unbound.dnsbl.localdata</id>
+        <label>DNSBL Null Response</label>
+        <type>checkbox</type>
+        <advanced>true</advanced>
+        <help><![CDATA[Return static null A/AAAA responses for supported response types.
+        Null response records may result in decreased performance and/or battery life for some devices or apps.
+        ]]></help>
+    </field>
+    <field>
         <id>unbound.dnsbl.lists</id>
         <label>URLs of Blocklists</label>
         <type>select_multiple</type>

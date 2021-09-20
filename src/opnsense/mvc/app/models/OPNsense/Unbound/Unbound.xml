@@ -1,7 +1,7 @@
 <model>
     <mount>//OPNsense/unboundplus</mount>
     <description>Unbound configuration</description>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <items>
         <service_enabled type="LegacyLinkField">
             <Source>unbound.enable</Source>
@@ -48,6 +48,35 @@
                     <yy>YoYo List</yy>
                 </OptionValues>
             </type>
+            <localzone type="OptionField">
+                <Required>Y</Required>
+                <default>__default__</default>
+                <OptionValues>
+                    <__default__>Return null (0.0.0.0) A record (default)</__default__>
+                    <always_nxdomain>Always return NXDOMAIN (always_nxdomain zone)</always_nxdomain>
+                    <always_null>Always return null A/AAAA response (always_null zone)</always_null>
+                    <redirect>Return NXDOMAIN or local data (redirect zone)</redirect>
+                    <inform_redirect>Log and return NXDOMAIN or local data (inform_redirect zone)</inform_redirect>
+                    <inform>Log and resolve normally or return local data (inform zone)</inform>
+                </OptionValues>
+                <Constraints>
+                    <check001>
+                        <reference>localdata.check001</reference>
+                    </check001>
+                </Constraints>
+            </localzone>
+            <localdata type="BooleanField">
+                <default>0</default>
+                <Required>Y</Required>
+                <Constraints>
+                    <check001>
+                        <ValidationMessage>Can not use local-data with specified zone type.</ValidationMessage>
+                        <type>DisallowIfConstraint</type>
+                        <field>localzone</field>
+                        <check>__default__,always_nxdomain,always_null</check>
+                   </check001>
+               </Constraints>
+            </localdata>
             <lists type="CSVListField">
                 <Required>N</Required>
             </lists>
