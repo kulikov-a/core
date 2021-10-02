@@ -819,7 +819,11 @@ function system_trust_configure($verbose = false)
                 $ca .= "\n# {$entry['descr']}\n" . str_replace("\r", '', base64_decode($entry['crt']));
             }
         }
-
+        foreach (glob("/usr/local/share/certs/blacklist/*.pem") as $bl_file) {
+            $bl_cer = file_get_contents($bl_file);
+            $bl_cer = str_replace("\r", '', $bl_cer);
+            $ca = str_replace($bl_cer, "# Trust to this CA is blocked by Administrator", $ca);
+        }
         file_put_contents($ca_cert_pem, $ca);
         copy($ca_cert_pem, '/usr/local/etc/ssl/cert.pem');
         @unlink('/etc/ssl/cert.pem'); /* do not clobber symlink target */
