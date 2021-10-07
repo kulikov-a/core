@@ -535,7 +535,7 @@ function filter_core_rules_system($fw, $defaults)
         }
     }
     // loopback
-    $fw->registerFilterRule(5, array('interface' => 'lo0', 'descr' => 'pass loopback'), $defaults['pass']);
+    $fw->registerFilterRule(5, array('direction' => 'any', 'interface' => 'lo0', 'statetype' => 'none', 'descr' => 'pass loopback'), $defaults['pass']);
     // out from this Firewall
     $fw->registerFilterRule(
         5,
