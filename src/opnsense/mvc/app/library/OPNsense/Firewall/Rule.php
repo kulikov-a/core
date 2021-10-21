@@ -287,6 +287,11 @@ abstract class Rule
                             $this->log("Unable to map port {$port}, empty?");
                         }
                     }
+                    if (strlen($port) > 0 && !Util::isPort($port) && !Util::isAlias($port)) {
+                        //port is set but is not valid port, range or alias
+                        $rule['disabled'] = true;
+                        $this->log("Unable to map port {$port}, config error?");
+                    }
                 }
                 if (!isset($rule[$target])) {
                     // couldn't convert address, disable rule

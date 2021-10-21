@@ -282,6 +282,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if ( (is_alias($pconfig['dstbeginport']) || is_alias($pconfig['dstendport']))  && $pconfig['dstbeginport'] != $pconfig['dstendport']) {
         $input_errors[] = gettext('When selecting aliases for destination ports, both from and to fields must be the same');
     }
+    if (!empty($pconfig['srcbeginport']) && !is_alias($pconfig['srcbeginport']) && $pconfig['srcbeginport'] != 'any' && !is_portrange($pconfig['srcbeginport'].':'.$pconfig['srcendport']))
+        $input_errors[] = sprintf(gettext("Source port range is not a valid port range."));
+    if (!empty($pconfig['dstbeginport']) && !is_alias($pconfig['dstbeginport']) && $pconfig['dstbeginport'] != 'any' && !is_portrange($pconfig['dstbeginport'].':'.$pconfig['dstendport']))
+        $input_errors[] = sprintf(gettext("Destination port range is not a valid port range."));
+
     if (!is_specialnet($pconfig['src'])) {
         if (!is_ipaddroralias($pconfig['src'])) {
             $input_errors[] = sprintf(gettext("%s is not a valid source IP address or alias."),$pconfig['src']);
