@@ -277,6 +277,14 @@ abstract class Rule
                 }
                 if (isset($rule['protocol']) && in_array(strtolower($rule['protocol']), array("tcp","udp","tcp/udp"))) {
                     $port = str_replace('-', ':', $rule[$tag]['port']);
+                    //convert 'any' to port number if applicable
+                    if (strpos($port,':any') !== false || strpos($port,'any:') !== false) {
+                        if (Util::isPort(explode(':',$port)[0], false)) {
+                           $port = str_replace('any', '65535', $port);
+                        } elseif (Util::isPort(explode(':',$port)[1], false)) {
+                           $port = str_replace('any', '1', $port);
+                        }
+                    }
                     if (Util::isPort($port)) {
                         $rule[$target . "_port"] = $port;
                     } elseif (Util::isAlias($port)) {
@@ -286,6 +294,11 @@ abstract class Rule
                             $rule['disabled'] = true;
                             $this->log("Unable to map port {$port}, empty?");
                         }
+                    }
+                    if (strlen($port) > 0 && !Util::isPort($port) && !Util::isAlias($port)) {
+                        //port is set but is not valid port, range or alias
+                        $rule['disabled'] = true;
+                        $this->log("Unable to map port {$port}, config error?");
                     }
                 }
                 if (!isset($rule[$target])) {
