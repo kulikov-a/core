@@ -84,14 +84,19 @@ class RuleCache(object):
                                     src_section = section_name.split('metadata_', 1)[1]
 
                                 if  src_section in src_pointer:
-                                    rule_data = src_pointer[src_section]
+                                    rule_data = src_pointer[src_section].split(',')
                                 elif src_section in rule['metadata']:
                                     # metadata field is actually a rule field (category)
-                                    rule_data = rule['metadata'][src_section]
+                                    # make a list with one member so we can iterate it later
+                                    rule_data = rule['metadata'][src_section].split('\r\n')
                                 else:
-                                    rule_data = None
-                                if rule_data not in configured_policies[policy_id][section_name]:
-                                    is_matched = False
+                                    rule_data = [None]
+                                for data in rule_data:
+                                    if data in configured_policies[policy_id][section_name]:
+                                        is_matched = True
+                                        break
+                                    else:
+                                        is_matched = False
                         if is_matched:
                             policy_match = policy_id
                             break
@@ -189,8 +194,8 @@ class RuleCache(object):
                             if prop == 'metadata':
                                 for mdtag in list(csv.reader([value], delimiter=","))[0]:
                                     parts = mdtag.split(maxsplit=1)
-                                    if parts:
-                                        record['metadata'][parts[0]] = parts[1] if len(parts) > 1 else None
+                                    if parts and len(parts) > 1:
+                                        record['metadata'][parts[0]] = record['metadata'][parts[0]] + ',' + parts[1] if parts[0] in record['metadata'] else parts[1]
                             else:
                                 record[prop] = value
 
@@ -253,6 +258,9 @@ class RuleCache(object):
         cur.execute("create table rule_properties(sid INTEGER, property text, value text) ")
         cur.execute("""create table local_rule_changes(sid number primary key, policy text,
                                                        action text, enabled BOOLEAN, last_mtime number)""")
+        # add temp_meta table for all (possibly recurring) metadata values
+        cur.execute("create table temp_meta(property text, value text) ")
+
         last_mtime = 0
         all_rule_files = self.list_local()
         rules_sql = 'insert into rules(%(fieldnames)s) values (%(fieldvalues)s)' % {
@@ -260,12 +268,15 @@ class RuleCache(object):
             'fieldvalues': ':' + (',:'.join(self._rule_fields))
         }
         rule_prop_sql = 'insert into rule_properties(sid, property, value) values (:sid, :property, :value)'
+        temp_meta_sql = 'insert into temp_meta(property, value) values (:property, :value)'
+
         for filename in all_rule_files:
             file_mtime = os.stat(filename).st_mtime
             if file_mtime > last_mtime:
                 last_mtime = file_mtime
             rules = list()
             rule_properties = list()
+            rule_meta_temp = list()
             for rule_info_record in self.list_rules(filename=filename):
                 if rule_info_record['metadata'] is not None:
                     rules.append(rule_info_record['metadata'])
@@ -281,17 +292,24 @@ class RuleCache(object):
                             "property": prop,
                             "value": rule_info_record['metadata']['metadata'][prop]
                         })
+                        for meta in rule_info_record['metadata']['metadata'][prop].split(','):
+                             rule_meta_temp.append({
+                                 "property": prop,
+                                 "value": meta
+                        })
 
             cur.executemany(rules_sql, rules)
             cur.executemany(rule_prop_sql, rule_properties)
+            cur.executemany(temp_meta_sql, rule_meta_temp)
         cur.execute('INSERT INTO stats (timestamp,files) VALUES (?,?) ', (last_mtime, len(all_rule_files)))
         cur.execute("""
                 create table metadata_histogram as
                 select distinct property, value, count(*) number_of_rules
-                from  rule_properties
-                where property not in ('created_at', 'updated_at')
+                from  temp_meta
                 group by property, value
         """)
+        # drop temporary table
+        cur.execute("drop table temp_meta ")
         db.commit()
         # release lock
         fcntl.flock(lock, fcntl.LOCK_UN)
