@@ -37,12 +37,23 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--filter', help='filter results', default='')
     parser.add_argument('--label', help='label / rule id', default='')
+    parser.add_argument('--address', help='kill states by source address', default='')
+    parser.add_argument('--related', help='kill related states', default='')
     inputargs = parser.parse_args()
 
-    # collect all unique state id's
     commands = dict()
-    for record in query_states(rule_label=inputargs.label, filter_str=inputargs.filter):
-        commands[record['id']] = "/sbin/pfctl -k id -k %s" % record['id']
+    if inputargs.address == '':
+        # collect all unique state id's
+        for record in query_states(rule_label=inputargs.label, filter_str=inputargs.filter):
+            commands[record['id']] = "/sbin/pfctl -k id -k %s" % record['id']
+    else:
+        # kill by source
+        for record in query_states(rule_label=inputargs.label, filter_str=inputargs.filter):
+            if record['src_addr'] == inputargs.address:
+                commands[record['id']] = "/sbin/pfctl -k id -k %s" % record['id']
+                # kill related states
+                if inputargs.related == 'Y' and record['nat_addr']:
+                    commands[record['id'] + "_related"] = "/sbin/pfctl -k %s -k %s" % (record['nat_addr'], record['dst_addr'])
 
     # drop list of states in chunks
     chunk_size = 500
