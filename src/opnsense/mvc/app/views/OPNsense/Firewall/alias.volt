@@ -204,6 +204,7 @@
          * Type selector, show correct type input.
          */
         $("#alias\\.type").change(function(){
+            $(".dummy_row").remove();
             $(".alias_type").hide();
             $("#row_alias\\.updatefreq").hide();
             $("#row_alias\\.interface").hide();
@@ -238,6 +239,10 @@
             } else {
                 $("#row_alias\\.counters").show();
             }
+            // add a dummy row to keep even \ odd
+            $(this).closest('table').find('tr[style*="display: none"]').each(function () {
+                $(this).clone().removeAttr('id').addClass("dummy_row").hide().insertAfter($(this));
+            });
         });
 
         /**
