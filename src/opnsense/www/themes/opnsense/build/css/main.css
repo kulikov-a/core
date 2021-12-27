@@ -7191,8 +7191,10 @@ main.page-content.col-lg-12 {
 }
 #navigation.col-sidebar-left > div > nav > #mainmenu > div > div.collapse.in > div.collapse.in {
   width: 168px;
+  max-height: 40vh;
   font-size: 14px;
   z-index: 10;
+  overflow-y: auto;
   position: absolute;
   left: 166px;
   margin-top: -26px;
