@@ -53,12 +53,22 @@ function restore_config_section($section_name, $new_contents)
     file_put_contents($tmpxml, $new_contents);
     $xml = load_config_from_file($tmpxml);
     @unlink($tmpxml);
-
-    if (!is_array($xml) || !isset($xml[$section_name])) {
-        return false;
+    if (strpos($section_name, "OPNsense_") !== false) {
+        $section_name = str_replace("OPNsense_", "", $section_name);
+        $xml = $xml["OPNsense"];
+        $pluginRestore = true;
+        syslog(LOG_NOTICE, 'OPNsense addition restore requested: ' . $section_name);
     }
 
-    $config[$section_name] = $xml[$section_name];
+    if (!is_array($xml) || !isset($xml[$section_name])) {
+        syslog(LOG_ERR, 'XML Section not found: ' . $section_name);
+        return false;
+    }
+    if ($pluginRestore) {
+        $config["OPNsense"][$section_name] = $xml[$section_name];
+    } else {
+        $config[$section_name] = $xml[$section_name];
+    }
 
     write_config(sprintf('Restored section %s of config file', $section_name));
     convert_config();
@@ -109,6 +119,10 @@ $areas = array(
     'wireless' => gettext('Wireless Devices'),
     'wol' => gettext('Wake on LAN'),
 );
+$cfgObj = OPNsense\Core\Config::getInstance()->object();
+foreach ($cfgObj->OPNsense->children() as $plugin => $val) {
+    $areas['OPNsense_' . (string)$plugin] = "Additions/" . (string)$plugin;
+}
 
 $backupFactory = new OPNsense\Backup\BackupFactory();
 $do_reboot = false;
