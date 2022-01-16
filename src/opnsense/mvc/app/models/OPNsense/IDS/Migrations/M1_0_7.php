@@ -47,17 +47,27 @@ class M1_0_7 extends BaseModelMigration
         }
         $csets = array();
         $nsets = array();
+        $uuids = array(); // all sets uuids
+        $c_uuids = array(); // store changed sets uuids
+        $n_uuids = array(); // store new sets uuids
+        $s_array = array(); // search uuids array for policies update
+        $r_array = array(); // replacement uuids array for policies update
         $changed_sets = ['emerging-current_events.rules', 'emerging-trojan.rules',
                          'emerging-malware.rules',  'emerging-info.rules', 'emerging-policy.rules'];
         $new_sets = ['emerging-ja3.rules', 'emerging-hunting.rules', 'emerging-adware_pup.rules',
                      'emerging-phishing.rules', 'emerging-exploit_kit.rules', 'emerging-coinminer.rules',
                      'emerging-malware.rules'];
         foreach ($model->files->file->iterateItems() as $file) {
+            if ($file->enabled == "1") {
+                $uuids[] = (string)$file->getAttribute('uuid');
+            }
             if (in_array((string)$file->filename, $changed_sets)) {
                 $csets[(string)$file->filename] = $file;
+                $c_uuids[(string)$file->filename] = (string)$file->getAttribute('uuid');
             }
             if (in_array((string)$file->filename, $new_sets)) {
                 $nsets[(string)$file->filename] = $file;
+                $n_uuids[(string)$file->filename] = (string)$file->getAttribute('uuid');
             }
         }
         // add all new to config in deselected state
@@ -66,32 +76,67 @@ class M1_0_7 extends BaseModelMigration
                 $node = $model->files->file->Add();
                 $node->filename = $filename;
                 $nsets[$filename] = $node;
+                $n_uuids[$filename] = (string)$file->getAttribute('uuid');
             }
         }
+        var_dump($c_uuids);
+        var_dump($n_uuids);
         // map rulesets
-        if (!empty($csets['emerging-malware.rules']) && $csets['emerging-malware.rules']->enabled == "1") {
-            $nsets['emerging-adware_pup.rules']->enabled = "1";
-            $nsets['emerging-adware_pup.rules']->filter = (string)$csets['emerging-malware.rules']->filter;
+        if (!empty($csets['emerging-malware.rules'])) {
+            if ($csets['emerging-malware.rules']->enabled == "1") {
+                $nsets['emerging-adware_pup.rules']->enabled = "1";
+            }
+            $s_array[] = $c_uuids['emerging-malware.rules'];
+            $r_array[] = $n_uuids['emerging-adware_pup.rules'];
         }
-        if (!empty($csets['emerging-current_events.rules']) && $csets['emerging-current_events.rules']->enabled == "1") {
-            $nsets['emerging-phishing.rules']->enabled = "1";
-            $nsets['emerging-phishing.rules']->filter = (string)$csets['emerging-current_events.rules']->filter;
-            $nsets['emerging-exploit_kit.rules']->enabled = "1";
-            $nsets['emerging-exploit_kit.rules']->filter = (string)$csets['emerging-current_events.rules']->filter;
+        if (!empty($csets['emerging-current_events.rules'])) {
+            if ($csets['emerging-current_events.rules']->enabled == "1") {
+                $nsets['emerging-phishing.rules']->enabled = "1";
+                $nsets['emerging-exploit_kit.rules']->enabled = "1";
+            }
+            $s_array[] = $c_uuids['emerging-current_events.rules'];
+            $r_array[] = $n_uuids['emerging-phishing.rules'] . "," . $n_uuids['emerging-exploit_kit.rules'];
         }
-        if (!empty($csets['emerging-trojan.rules']) && $csets['emerging-trojan.rules']->enabled == "1") {
-            $nsets['emerging-coinminer.rules']->enabled = "1";
-            $nsets['emerging-coinminer.rules']->filter = (string)$csets['emerging-trojan.rules']->filter;
-            $nsets['emerging-malware.rules']->enabled = "1";
-            $nsets['emerging-malware.rules']->filter = (string)$csets['emerging-malware.rules']->filter;
+        if (!empty($csets['emerging-trojan.rules'])) {
+            if ($csets['emerging-trojan.rules']->enabled == "1") {
+                $nsets['emerging-coinminer.rules']->enabled = "1";
+                $nsets['emerging-malware.rules']->enabled = "1";
+            }
+            $s_array[] = $c_uuids['emerging-trojan.rules'];
+            $r_array[] = $n_uuids['emerging-coinminer.rules'] . "," . $n_uuids['emerging-malware.rules'];
         }
-        if (!empty($csets['emerging-info.rules']) && $csets['emerging-info.rules']->enabled == "1") {
-            $nsets['emerging-hunting.rules']->enabled = "1";
-            $nsets['emerging-hunting.rules']->filter = (string)$csets['emerging-info.rules']->filter;
+        if (!empty($csets['emerging-info.rules'])) {
+            if ($csets['emerging-info.rules']->enabled == "1") {
+                $nsets['emerging-hunting.rules']->enabled = "1";
+            }
+            $s_array[] = $c_uuids['emerging-info.rules'];
+            $r_array[] = $n_uuids['emerging-hunting.rules'];
         }
-        if (!empty($csets['emerging-policy.rules']) && $csets['emerging-policy.rules']->enabled == "1") {
-            $nsets['emerging-hunting.rules']->enabled = "1";
-            $nsets['emerging-hunting.rules']->filter = (string)$csets['emerging-policy.rules']->filter;
+        if (!empty($csets['emerging-policy.rules'])) {
+            if ($csets['emerging-policy.rules']->enabled == "1") {
+                $nsets['emerging-hunting.rules']->enabled = "1";
+            }
+            $s_array[] = $c_uuids['emerging-policy.rules'];
+            $r_array[] = $n_uuids['emerging-hunting.rules'];
+        }
+        var_dump($s_array);
+        var_dump($r_array);
+        foreach ($model->policies->policy->iterateItems() as $policy) {
+            //var_dump((string)$policy->rulesets);
+            if ((string)($policy->rulesets) != "") {
+                //$policy->rulesets = implode(',', array_unique(explode(',', str_replace($s_array, $r_array, $policy->rulesets))));
+                var_dump((string)$policy->rulesets);
+                // replace change sets with new one and remove obsolete links (ruleset no exists or not enabled)
+                $sets = array_unique(explode(',', str_replace($s_array, $r_array, $policy->rulesets)));
+                foreach ($sets as $i => $uuid) {
+                    if (!in_array($uuid, $uuids)) {
+                        unset($sets[$i]);
+                    }
+                }
+                $policy->rulesets = implode(',', $sets);
+                echo "new: \n\r";
+                var_dump((string)$policy->rulesets);
+            }
         }
         if (!empty($csets['emerging-trojan.rules'])) {
             // deprecated ruleset
