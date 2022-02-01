@@ -191,8 +191,13 @@ function window_highlight_table_option()
  */
 function hook_firewall_categories() {
     let cat_select = $("#fw_category");
+    cats_filter_store = window.location.href.split("/").pop().replace(/\?|\=|\&|\./gi,"_") + "_firewall.selected.categories";
+    cats_gr_view = cats_filter_store + "_grview";
+    plain_view = true;
     ajaxCall('/api/firewall/category/searchNoCategoryItem', {}, function(data){
         if (data.rows !== undefined && data.rows.length > 0) {
+            // attach received data to select. will use later
+            cat_select.data("categories", data.rows);
             let color_map = {};
             for (let i=0; i < data.rows.length ; ++i) {
                 if (data.rows[i].color != "") {
@@ -207,12 +212,14 @@ function hook_firewall_categories() {
                         category_count[item] = 0 ;
                     }
                     category_count[item] += 1;
+                    let td = row.find('td.rule-description');
                     if (color_map[item] !== undefined) {
                         // suffix category color in the description td
-                        let td = row.find('td.rule-description');
                         if (td.length > 0) {
                             td.append($("<i class='fa fa-circle selector-item'  title='"+item+"'/>").css('color', '#'+color_map[item]));
                         }
+                    } else if (item.length > 0) {
+                        td.append($("<i class='fa fa-circle-thin selector-item'  title='"+item+"'/>"));
                     }
                 });
             });
@@ -239,40 +246,176 @@ function hook_firewall_categories() {
             cat_select.addClass('hidden');
         } else {
             let tmp  = [];
-            if (window.sessionStorage && window.sessionStorage.getItem("firewall.selected.categories") !== null) {
-                tmp = window.sessionStorage.getItem("firewall.selected.categories").split(',');
+            if (window.sessionStorage && window.sessionStorage.getItem(cats_filter_store) !== null) {
+                tmp = window.sessionStorage.getItem(cats_filter_store).split(',');
             }
             cat_select.val(tmp);
         }
 
         cat_select.change(function(){
             if (window.sessionStorage) {
-                window.sessionStorage.setItem("firewall.selected.categories", cat_select.val().join(','));
+                window.sessionStorage.setItem(cats_filter_store, cat_select.val().join(','));
             }
             let selected_values = cat_select.val();
             let no_cat = cat_select.find("option")[0].value;
-            $(".rule").each(function(){
-                let is_selected = false;
-                $(this).data('category').toString().split(',').forEach(function(item){
-                    if (selected_values.indexOf(no_cat) > -1 && item === "") {
-                        // No category for this rule
-                        is_selected = true;
-                    }
-                    if (selected_values.indexOf(item) > -1) {
-                        is_selected = true;
+            if (plain_view) {
+                $(".rule").each(function(){
+                    let is_selected = false;
+                    $(this).data('category').toString().split(',').forEach(function(item){
+                        if (selected_values.indexOf(no_cat) > -1 && item === "") {
+                            // No category for this rule
+                            is_selected = true;
+                        }
+                        if (selected_values.indexOf(item) > -1) {
+                            is_selected = true;
+                        }
+                    });
+                    if (!is_selected && selected_values.length > 0) {
+                        $(this).hide();
+                        $(this).find("input.rule_select").prop('disabled', true);
+                    } else {
+                        $(this).find("input.rule_select").prop('disabled', false);
+                        $(this).show();
                     }
                 });
-                if (!is_selected && selected_values.length > 0) {
-                    $(this).hide();
-                    $(this).find("input").prop('disabled', true);
-                } else {
-                    $(this).find("input").prop('disabled', false);
-                    $(this).show();
-                }
-            });
+            } else {
+                // switch to "group" logic
+                $(".control_row").each(function() {
+                    let cur_toggle = $("a.gr-ctrl-toggler", this);
+                    let cur_cat = cur_toggle.data("target");
+                    if (selected_values.indexOf(cur_cat) === -1 && selected_values.length > 0) {
+                        $(this).hide();
+                        //$("tr.rule[data-category_group='" + cur_cat + "']").find("input.rule_select").prop('disabled', true);
+                        if (cur_toggle.hasClass("gr-ctrl-opened")) {
+                            cur_toggle.click();
+                        }
+                    } else {
+                        $(this).show();
+                        //$("tr.rule[data-category_group='" + cur_cat + "']").find("input.rule_select").prop('disabled', false);
+                    }
+                    // for discussion: should we restore group toggle state if group was hidden and then shown again?
+                    // for discussion: should we allow rules mass-select without group expanding?
+                });
+            }
             $(".opnsense-rules").change();
         });
         cat_select.change();
         $('.selector-item').tooltip();
+
+        // handle "Show by cats".
+        // add view toggle button and bind action.
+        $("#fw_category").parent().before('<button type="button" id="btn_showbycat" class="btn btn-default hidden-xs pull-right"><i class="fa fa-list-ul" aria-hidden="true" title="Show by categories"></i></button>');
+        $("#btn_showbycat").click(function() {
+            if (window.localStorage) {
+                window.localStorage.setItem(cats_gr_view, !$(this).hasClass("btn-danger"));
+            }
+            $(this).toggleClass("btn-danger");
+            if ($(this).hasClass("btn-danger")) {
+                plain_view = false;
+                ShowByCat();
+            } else {
+                location.reload();
+            }
+        });
+
+        // switch view if needed
+        if (window.localStorage && window.localStorage.getItem(cats_gr_view) === "true") {
+            $("#btn_showbycat").click();
+        }
     });
+}
+
+// Nasty way to handle "group by category". Manipulate DOM multiple times to compose new look. Should be better with MVC.
+function ShowByCat() {
+    // Will store group toggle state in sessionStorage.
+    group_expanded = cats_filter_store + "_exp_";
+
+    // Add control column.
+    $("table.opnsense-rules:first > tbody > tr").each(function() {
+        let r_num = $(this).hasClass("rule") ? $(this).find("input.rule_select").attr("value") : "";
+        let r_num_txt = r_num.length > 0 ? "#" + r_num : "";
+        $(this).attr("data-i", r_num).prepend('<td class="category_control" style="text-align: center;">' + r_num_txt + '</td>');
+    });
+
+    // clone rules with multiple cats. re-apply tooltips inside clone.
+    let all_cats = $("#fw_category").data("categories");
+    $("table.opnsense-rules > tbody >tr.rule").each(function() {
+        let cats = $(this).data("category").split(",");
+        let first_cat = cats[0] == "" ? '(No Category)' : cats[0];
+        $(this).attr("data-category_group", first_cat);
+        if (cats.length > 1) {
+            cats.shift();
+            let row = $(this);
+            $.each(cats, function(i, val) {
+                $clone = row.clone(true).attr("data-category_group", val).insertAfter(row);
+                $clone.find('i.selector-item').each(function() {
+                    $(this).attr("title", $(this).data("originalTitle")).removeAttr("data-original-title").removeData("bs.tooltip");
+                    $(this).tooltip();
+                });
+            })
+        }
+    });
+
+    // sort rows by category and rule number
+    let target = $("table.opnsense-rules tbody").first();
+    target.find("tr.rule").sort(function(a, b) {
+        let a_cat = $(a).data("category_group").toLowerCase();
+        let b_cat = $(b).data("category_group").toLowerCase();
+        if (a_cat === b_cat) {
+            return parseInt($(a).data('i')) - parseInt($(b).data('i'));
+        } else {
+            return a_cat.localeCompare(b_cat, undefined, {numeric: true});
+        }
+    }).appendTo(target);
+
+    // add leading row for each category for collapse/expand button and category color (if any)
+    // hide rows after
+    $.each(all_cats, function(key, val) {
+        $("tr.rule[data-category_group='" + val.name + "']").first().before('<tr class="control_row"><td colspan="100%"><a class="gr-ctrl-toggler gr-ctrl-closed" aria-hidden="true" style="color: unset; cursor: pointer;" data-target="' + val.name + '" data-target_uuid="' + val.uuid + '"><i class="fa fa-plus-square-o"></i> ' + val.name + '</a></td></tr>');
+        if (val.color != "") {
+            $("a.gr-ctrl-toggler[data-target='" + val.name + "']").after('&nbsp;&nbsp;<i class="fa fa-circle selector-item" title="' + val.name + '" style="color: #' + val.color + ';"></i>');
+        } else if (val.uuid.length > 0) {
+            $("a.gr-ctrl-toggler[data-target='" + val.name + "']").after('&nbsp;&nbsp;<i class="fa fa-circle-thin selector-item" title="' + val.name + '"></i>');
+        }
+        $("tr.rule[data-category_group='" + val.name + "']").hide().find("input.rule_select").prop('disabled', true);
+    });
+    $('.selector-item').tooltip();
+
+    // bind toggler function
+    $(".gr-ctrl-toggler").click(function() {
+        $(this).children("i").toggleClass("fa-plus-square-o fa-minus-square-o");
+        $(this).toggleClass("gr-ctrl-closed gr-ctrl-opened");
+        if (window.sessionStorage) {
+            window.sessionStorage.setItem(group_expanded + $(this).data("target_uuid"), $(this).hasClass("gr-ctrl-opened"));
+        }
+        // for discussion: can only select visible rules (expanded group) for damage-proof. or should we allow mass select for all visible groups wihtout expanding them
+        if ($(this).hasClass("gr-ctrl-closed")) {
+            $("tr.rule[data-category_group='" + $(this).data("target") + "']").hide().find("input.rule_select").prop('disabled', true);
+        } else {
+            $("tr.rule[data-category_group='" + $(this).data("target") + "']").show().find("input.rule_select").prop('disabled', false);
+        }
+        $(".opnsense-rules").change();
+    });
+    
+    // to reduce confusion, allow movements only within the group
+    $("input.rule_select").click(function() {
+        // hide "move" buttons on other groups
+        if ($(this).is(':checked')) {
+            let c_group = $(this).closest("tr").data("category_group");
+            $("tr.rule[data-category_group!='" + c_group + "']").find(".act_move").css("visibility","hidden");
+        } else if ($("input.rule_select:checked").length == 0) {
+            $(".act_move").css("visibility","");
+        }
+    });
+
+    // open groups if needed
+    $.each(all_cats, function(key, val) {
+        if (window.sessionStorage && window.sessionStorage.getItem(group_expanded + val.uuid) === "true") {
+            $(".gr-ctrl-toggler[data-target_uuid='" + val.uuid + "']").click();
+        }
+    });
+
+    // apply filter and adjust stripes
+    $("#fw_category").change();
+    $(".opnsense-rules").change();
 }
