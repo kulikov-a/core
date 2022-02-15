@@ -157,6 +157,8 @@ if ($ip != $cacheip || !is_ipaddr($config['interfaces'][$interface]['ipaddr'])) 
         log_error("IP address change detected, killing states of old ip $cacheip");
         mwexecf('/sbin/pfctl -k 0.0.0.0/0 -k %s', $cacheip);
         mwexecf('/sbin/pfctl -k %s', $cacheip);
+       /* experimental. Flush states by interface with "M"atching opposite states */
+        mwexecf('/sbin/pfctl -M -i %s -Fs', $interface_real);
     }
 
     @file_put_contents($cacheip_file, $ip . PHP_EOL);
