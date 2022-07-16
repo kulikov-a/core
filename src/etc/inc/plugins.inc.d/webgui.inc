@@ -434,6 +434,12 @@ EOD;
         $lighty_config .= "}\n";
     }
 
+    if (!isset($config['system']['deployment'])) {
+       $lighty_config .= "# send static error pages for some errors in Production mode\n";
+       $lighty_config .= "server.error-intercept = \"enable\"\n";
+       $lighty_config .= "server.errorfile-prefix = \"/usr/local/www/errors/status-\"\n";
+    }
+
     $lighty_config .= <<<EOD
 
 ## error-handler for status 404
