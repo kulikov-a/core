@@ -1,6 +1,6 @@
 <model>
     <mount>//OPNsense/proxy</mount>
-    <version>1.0.5</version>
+    <version>1.0.6</version>
     <description>
         (squid) proxy settings
     </description>
@@ -432,6 +432,13 @@
                     <Required>N</Required>
                     <mask>/^([ \-0-9a-zA-Z:,])*/u</mask>
                 </sslPorts>
+                <BrokenButTrusted type="CSVListField">
+                    <Required>N</Required>
+                </BrokenButTrusted>
+                <BrokenButTrustedSignTrusted type="BooleanField">
+                    <default>0</default>
+                    <Required>Y</Required>
+                </BrokenButTrustedSignTrusted>
                 <remoteACLs>
                     <blacklists>
                         <blacklist type="ArrayField">

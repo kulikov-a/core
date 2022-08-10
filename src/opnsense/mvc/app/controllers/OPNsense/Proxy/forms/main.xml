@@ -493,6 +493,22 @@
                 <allownew>true</allownew>
                 <advanced>true</advanced>
             </field>
+            <field>
+                <id>proxy.forward.acl.BrokenButTrusted</id>
+                <label>Allow broken server certificate</label>
+                <type>select_multiple</type>
+                <style>tokenize</style>
+                <help>Listed domains will bypass server certificate validation errors.</help>
+                <hint>Add domain names.</hint>
+                <allownew>true</allownew>
+                <advanced>true</advanced>
+            </field>
+            <field>
+                <id>proxy.forward.acl.BrokenButTrustedSignTrusted</id>
+                <label>Sign broken servers certs as trusted</label>
+                <type>checkbox</type>
+                <help>Sign certificates from the list above as trusted</help>
+            </field>
         </subtab>
         <subtab id="proxy-icap" description="ICAP Settings">
             <field>
