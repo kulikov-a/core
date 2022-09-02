@@ -59,6 +59,7 @@ phpseclib_autoload('ParagonIE\ConstantTime', '/usr/local/share/phpseclib/paragon
 phpseclib_autoload('phpseclib3', '/usr/local/share/phpseclib');
 
 use phpseclib3\File\X509;
+use phpseclib3\Crypt\RSA;
 use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Exception\NoKeyLoadedException;
 
@@ -653,7 +654,8 @@ function crl_update(&$crl)
     /* Load in the CA's cert */
     $ca_cert = new X509();
     $ca_cert->loadX509($ca_str_crt);
-
+    $ca_sig_algo = $ca_cert->getCurrentCert()['signatureAlgorithm']['algorithm'];
+    
     if (!$ca_cert->validateDate()) {
         syslog(LOG_ERR, 'Cert revocation error: CA certificate invalid: invalid date');
         return false;
@@ -662,6 +664,14 @@ function crl_update(&$crl)
     /* get the private key to sign the new (updated) CRL */
     try {
         $ca_key = PublicKeyLoader::loadPrivateKey($ca_str_key);
+        if (openssl_pkey_get_details(openssl_pkey_get_private($ca_str_key))['type'] === 0) {
+            // RSA type key. phpseclib3 is setting RSA::SIGNATURE_PSS by default and then fails verifications.
+            // && $ca_sig_algo !== "id-RSASSA-PSS" is more precise and also works for RSA. and should allow to create crl with PSS signature
+            // and it does but then fails on validateSignature()
+            // force to use RSA::SIGNATURE_PKCS1 for all RSA type CA certs for now
+            // or should we stop using validateSignature() at all?
+            $ca_key = $ca_key->withPadding(RSA::SIGNATURE_PKCS1);
+        }
         $ca_cert->setPrivateKey($ca_key);
     } catch (NoKeyLoadedException $e) {
         syslog(LOG_ERR, 'Cert revocation error: Unable to load CA private key');
@@ -698,8 +708,13 @@ function crl_update(&$crl)
             $x509_cert = new X509();
             $x509_cert->loadCA($ca_str_crt);
             $raw_cert = $x509_cert->loadX509(base64_decode($cert['crt']));
-            if (!$x509_cert->validateSignature(false)) {
-                syslog(LOG_ERR, "Cert revocation error: CA validation failed.");
+            try {
+                if (!$x509_cert->validateSignature(false)) {
+                    syslog(LOG_ERR, "Cert revocation error: CA validation failed.");
+                    return false;
+                }
+            } catch (Exception $e) {
+                syslog(LOG_ERR, 'Cert revocation error: CA validation failed ' . $e);
                 return false;
             }
             /* Get serial number of cert */
