@@ -313,6 +313,7 @@
                     apply_filter();
 
                     // limit output, try to keep max X records on screen.
+                    $("#grid-log > tbody > tr:hidden").remove();
                     $("#grid-log > tbody > tr:gt("+max_rows+")").remove();
 
                     // bind info buttons
