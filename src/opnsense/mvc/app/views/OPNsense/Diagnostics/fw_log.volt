@@ -24,9 +24,16 @@
  # POSSIBILITY OF SUCH DAMAGE.
  #}
 
+<style>
+    .unfiltered {
+        display: none;
+    }
+</style>
 <script>
     'use strict';
 
+    var last_digest = '';
+    var record_spec = [];
     $( document ).ready(function() {
         var field_type_icons = {
           'binat': 'fa-exchange',
@@ -39,6 +46,16 @@
         };
         var interface_descriptions = {};
         let hostnameMap = {};
+
+        // read heading, contains field specs
+        $("#grid-log > thead > tr > th ").each(function () {
+            record_spec.push({
+                    'column-id': $(this).data('column-id'),
+                    'type': $(this).data('type'),
+                    'class': $(this).attr('class')
+                });
+        });
+
 
         /**
          * reverse lookup address fields (replace address part for hostname if found)
@@ -225,41 +242,38 @@
 
 
         function fetch_log() {
-            let record_spec = [];
+            const log_fetched = new $.Deferred();
             // Overfetch for limited display scope to increase the chance of being able to find matches.
             // As we fetch once per second, we would be limited to 25 records/sec of log data when 25 is selected.
-            let max_rows = Math.max(1000, parseInt($("#limit").val()));
-            // read heading, contains field specs
-            $("#grid-log > thead > tr > th ").each(function () {
-                record_spec.push({
-                    'column-id': $(this).data('column-id'),
-                    'type': $(this).data('type'),
-                    'class': $(this).attr('class')
-                });
-            });
-            // read last digest (record hash) from top data row
-            var last_digest = $("#grid-log > tbody > tr:first > td:first").text();
+            let max_rows = parseInt($("#limit").val());
+            let max_rows_fetch = Math.max(1000, max_rows);
+            // use last digest (record hash) to limit data size
+            // digest migrated from DOM storage to global var
+            // if grid reseted between ajax calls set empty digest
+            last_digest = last_digest == "__false__" ? "" : last_digest;
             // fetch new log lines and add on top of grid-log
-            ajaxGet('/api/diagnostics/firewall/log/', {'digest': last_digest, 'limit': max_rows}, function(data, status) {
+            ajaxGet('/api/diagnostics/firewall/log/', {'digest': last_digest, 'limit': max_rows_fetch}, function(data, status) {
+                log_fetched.resolve();
                 if (status == 'error') {
                     // stop poller on failure
                     $("#auto_refresh").prop('checked', false);
-                } else if (last_digest != '' && $("#grid-log > tbody > tr").length == 1){
-                    // $("#limit").change(); called, this request should be discarted (data grid reset)
+                } else if (last_digest == "__false__"){
+                    // grid was reset during ajax request, this request should be discarded
+                    last_digest = '';
                     return;
                 } else if (data !== undefined && data.length > 0) {
                     let record;
                     let trs = [];
                     while ((record = data.pop()) != null) {
                         if (record['__digest__'] != last_digest) {
-                            var log_tr = $("<tr>");
+                            last_digest = record['__digest__'];
+                            var log_tr = $('<tr class="log_tr unfiltered">');
                             if (record.interface !== undefined && interface_descriptions[record.interface] !== undefined) {
                                 record['interface_name'] = interface_descriptions[record.interface];
                             } else {
                                 record['interface_name'] = record.interface;
                             }
                             log_tr.data('details', record);
-                            log_tr.hide();
                             $.each(record_spec, function(idx, field){
                                 var log_td = $('<td>').addClass(field['class']);
                                 var column_name = field['column-id'];
@@ -284,7 +298,7 @@
                                         }
                                         break;
                                     case 'info':
-                                        log_td.html('<button class="act_info btn btn-xs fa fa-info-circle" aria-hidden="true"></i>');
+                                        log_td.html('<button class="act_info no_bind btn btn-xs fa fa-info-circle" aria-hidden="true"></i>');
                                         break;
                                     case 'label':
                                         // record data is always html-escaped. no special protection required
@@ -313,10 +327,10 @@
                     apply_filter();
 
                     // limit output, try to keep max X records on screen.
-                    $("#grid-log > tbody > tr:gt("+max_rows+")").remove();
+                    $(".log_tr").slice(max_rows).remove();
 
                     // bind info buttons
-                    $(".act_info").unbind('click').click(function(){
+                    $(".act_info.no_bind").removeClass("no_bind").click(function(){
                         var sender_tr = $(this).parent().parent();
                         var sender_details = sender_tr.data('details');
                         var hidden_columns = ['__spec__', '__host__', '__digest__'];
@@ -398,6 +412,7 @@
                     }
                 }
             });
+            return log_fetched;
         }
 
         // matcher
@@ -425,55 +440,58 @@
                 filters.push($(this).data('filter'));
             });
             let filter_or_type = $("#filter_or_type").is(':checked');
-            $("#grid-log > tbody > tr").each(function(){
-                let selected_tr = $(this);
-                let this_data = $(this).data('details');
-                if (this_data === undefined) {
-                    return;
-                }
-                let is_matched = (filters.length > 0) ? !filter_or_type : true;
-                for (let i=0; i < filters.length; i++) {
-                    let filter_value = filters[i].value.toLowerCase();
-                    let filter_condition = filters[i].condition;
-                    let this_condition_match = false;
-                    let filter_tag = filters[i].tag;
-
-                    if (filter_tag === '__addr__') {
-                        let src_match = match_filter(filter_value, filter_condition, this_data['src']);
-                        let dst_match = match_filter(filter_value, filter_condition, this_data['dst']);
-                        if (!filter_condition.match('!')) {
-                            this_condition_match = src_match || dst_match;
-                        } else {
-                            this_condition_match = src_match && dst_match;
-                        }
-                    } else if (filter_tag === '__port__') {
-                        let srcport_match = match_filter(filter_value, filter_condition, this_data['srcport']);
-                        let dstport_match = match_filter(filter_value, filter_condition, this_data['dstport']);
-                        if (!filter_condition.match('!')) {
-                            this_condition_match = srcport_match || dstport_match;
-                        } else {
-                            this_condition_match = srcport_match && dstport_match;
-                        }
-                    } else {
-                        this_condition_match = match_filter(filter_value, filter_condition, this_data[filter_tag]);
+            $("tr.unfiltered").each(function(){
+                if (visible_rows < max_rows) {
+                    let selected_tr = $(this);
+                    let this_data = $(this).data('details');
+                    if (this_data === undefined) {
+                        return;
                     }
+                    let is_matched = (filters.length > 0) ? !filter_or_type : true;
+                    for (let i=0; i < filters.length; i++) {
+                        let filter_value = filters[i].value.toLowerCase();
+                        let filter_condition = filters[i].condition;
+                        let this_condition_match = false;
+                        let filter_tag = filters[i].tag;
 
-                    if (!this_condition_match && !filter_or_type) {
-                        // normal AND condition, exit when one of the criteria is not met
-                        is_matched = this_condition_match;
-                        break;
-                    } else if (filter_or_type) {
-                        // or condition is deselected by default
-                        is_matched = is_matched || this_condition_match;
+                        if (filter_tag === '__addr__') {
+                            let src_match = match_filter(filter_value, filter_condition, this_data['src']);
+                            let dst_match = match_filter(filter_value, filter_condition, this_data['dst']);
+                            if (!filter_condition.match('!')) {
+                                this_condition_match = src_match || dst_match;
+                            } else {
+                                this_condition_match = src_match && dst_match;
+                            }
+                        } else if (filter_tag === '__port__') {
+                            let srcport_match = match_filter(filter_value, filter_condition, this_data['srcport']);
+                            let dstport_match = match_filter(filter_value, filter_condition, this_data['dstport']);
+                            if (!filter_condition.match('!')) {
+                                this_condition_match = srcport_match || dstport_match;
+                            } else {
+                                this_condition_match = srcport_match && dstport_match;
+                            }
+                        } else {
+                            this_condition_match = match_filter(filter_value, filter_condition, this_data[filter_tag]);
+                        }
+
+                        if (!this_condition_match && !filter_or_type) {
+                            // normal AND condition, exit when one of the criteria is not met
+                            is_matched = this_condition_match;
+                            break;
+                        } else if (filter_or_type) {
+                            // or condition is deselected by default
+                            is_matched = is_matched || this_condition_match;
+                        }
                     }
-                }
-                if (is_matched && visible_rows <= max_rows) {
-                    selected_tr.show();
-                    visible_rows += 1;
+                    if (is_matched && visible_rows < max_rows) {
+                        selected_tr.removeClass("unfiltered");
+                        visible_rows += 1;
+                    }
                 } else {
-                    selected_tr.hide();
+                    return false; // break loop if we have max_rows result already
                 }
             });
+            $("tr.unfiltered").remove();
         }
 
         $("#add_filter_condition").click(function(){
@@ -498,28 +516,36 @@
                 }
                 $('.selectpicker').selectpicker('refresh');
                 $("#filter_tag").change();
-                apply_filter();
+                grid_reset();
             });
             $("#filters").append($new_filter);
             $("#filter_value").val("");
             $("#filters_help").show();
-            apply_filter();
+            grid_reset();
         });
 
         $("#filter_or_type").click(function(){
-            apply_filter();
+            grid_reset();
         });
 
         // reset log content on limit change, forces a reload
-        $("#limit").change(function(){
+        function grid_reset() {
             $('#grid-log > tbody').html("<tr></tr>");
+            last_digest = "__false__";
+        }
+
+        $("#limit").change(function(){
+            grid_reset();
         });
 
         function poller() {
             if ($("#auto_refresh").is(':checked')) {
-                fetch_log();
+                fetch_log().done(function(){
+                    setTimeout(poller, 1000);
+                });
+            } else {
+                setTimeout(poller, 1000);
             }
-            setTimeout(poller, 1000);
         }
         // manual refresh
         $("#refresh").click(function(){
