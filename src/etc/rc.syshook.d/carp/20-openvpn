@@ -36,12 +36,12 @@ $subsystem = !empty($argv[1]) ? $argv[1] : '';
 $type = !empty($argv[2]) ? $argv[2] : '';
 
 if ($type != 'MASTER' && $type != 'BACKUP') {
-    log_msg("Carp '$type' event unknown from source '{$subsystem}'");
+    log_msg("Carp '$type' event unknown from source '{$subsystem}'", LOG_ERR);
     exit(1);
 }
 
 if (!strstr($subsystem, '@')) {
-    log_msg("Carp '$type' event triggered from wrong source '{$subsystem}'");
+    log_msg("Carp '$type' event triggered from wrong source '{$subsystem}'", LOG_ERR);
     exit(1);
 }
 
