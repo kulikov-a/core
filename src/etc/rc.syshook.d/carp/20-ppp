@@ -37,10 +37,10 @@ $type = !empty($argv[2]) ? $argv[2] : '';
 $a_hasync = &config_read_array('hasync');
 if (!empty($a_hasync['disconnectppps'])) {
     if ($type != 'MASTER' && $type != 'BACKUP') {
-       log_msg("Carp '$type' event unknown from source '{$subsystem}'");
+       log_msg("Carp '$type' event unknown from source '{$subsystem}'", LOG_ERR);
        exit(1);
     } elseif (!strstr($subsystem, '@')) {
-       log_msg("Carp '$type' event triggered from wrong source '{$subsystem}'");
+       log_msg("Carp '$type' event triggered from wrong source '{$subsystem}'", LOG_ERR);
        exit(1);
     }
 
