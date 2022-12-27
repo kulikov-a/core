@@ -32,7 +32,6 @@ $( document ).ready(function() {
     let heading_appended = false;
     $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
         if (e.target.id == 'host_overrides_tab') {
-            $("#grid-aliases-wrapper").show();
             $("#grid-hosts").bootgrid('destroy');
             let grid_hosts = $("#grid-hosts").UIBootgrid({
                 search:'/api/unbound/settings/searchHostOverride/',
@@ -92,44 +91,64 @@ $( document ).ready(function() {
                 });
             });
 
-            let grid_aliases = $("#grid-aliases").UIBootgrid({
-                search:'/api/unbound/settings/searchHostAlias/',
-                get:'/api/unbound/settings/getHostAlias/',
-                set:'/api/unbound/settings/setHostAlias/',
-                add:'/api/unbound/settings/addHostAlias/',
-                del:'/api/unbound/settings/delHostAlias/',
-                toggle:'/api/unbound/settings/toggleHostAlias/',
-                options: {
-                    labels: {
-                        noResults: "{{ lang._('No results found for selected host or none selected') }}"
-                    },
-                    selection: true,
-                    multiSelect: true,
-                    rowSelect: true,
-                    useRequestHandlerOnGet: true,
-                    requestHandler: function(request) {
-                        let uuids = $("#grid-hosts").bootgrid("getSelectedRows");
-                        request['host'] = uuids.length > 0 ? uuids[0] : "__not_found__";
-                        let selected = $(".host_selected");
-                        uuids.length > 0 ? selected.show() : selected.hide();
-                        return request;
+
+        } else if (e.target.id == 'aliases_tab') {
+            $("#grid-aliases").bootgrid('destroy');
+            ajaxCall('/api/unbound/settings/searchHostOverride/', {}, function (data, status) {
+                if (typeof data.rows !== "undefined") {
+                    hp_options = [];
+                    while ((entry = data.rows.shift())) {
+                        let option = $('<option>', {'data-subtext':"(" + entry.rr.split(" ")[0] + ")", value:entry.uuid, text:entry.hostname + "." + entry.domain });
+                        hp_options.push(option);
                     }
                 }
+                $("#grid-aliases").on("initialized.rs.jquery.bootgrid", function (e) {
+                    $("#host-picker").append(hp_options);
+                    $("#host-picker").on('change', function() {
+                        $("#grid-aliases").bootgrid('reload');
+                    });
+                    $("#host-picker").selectpicker("refresh");
+                });
+                let grid_aliases = $("#grid-aliases").UIBootgrid({
+                    search:'/api/unbound/settings/searchHostAlias/',
+                    get:'/api/unbound/settings/getHostAlias/',
+                    set:'/api/unbound/settings/setHostAlias/',
+                    add:'/api/unbound/settings/addHostAlias/',
+                    del:'/api/unbound/settings/delHostAlias/',
+                    toggle:'/api/unbound/settings/toggleHostAlias/',
+                    options: {
+                        templates: {
+                            header: "<div id=\"\{\{ctx.id\}\}\" class=\"\{\{css.header\}\}\"><div class=\"row\"><div class=\"col-sm-12 actionBar\"><p class=\"\{\{css.search\}\}\"></p><select id=\"host-picker\" class=\"host-selectpicker\" data-width=\"200px\" data-live-search=\"true\" data-show-subtext=\"true\"><option value=\"\">All</option></select><p class=\"\{\{css.actions\}\}\"></p></div></div></div>"
+                        },
+                        labels: {
+                            noResults: "{{ lang._('No aliases found for selected host') }}"
+                        },
+                        selection: true,
+                        multiSelect: true,
+                        rowSelect: true,
+                        useRequestHandlerOnGet: true,
+                        requestHandler: function(request) {
+                            let host = $("#host-picker").val();
+                            request['host'] = host.length > 0 ? host : "";
+                            //let selected = $(".host_selected");
+                            //uuids.length > 0 ? selected.show() : selected.hide();
+                            return request;
+                        }
+                    }
+                }).on("loaded.rs.jquery.bootgrid", function (e) {
+                //    console.log("loaded");
+                //    $("#host-picker").append(hp_options);
+                //    $("#host-picker").selectpicker("refresh");
+
+                //    $("#host-picker").selectpicker("refresh");
+                //                let selected = $(".host_selected");
+                //                let noResultsMsg = selected.is(":visible") ? "{{ lang._('No aliases found for selected host') }}" : "{{ lang._('Select a host first') }}";
+                //                $("#grid-aliases .no-results").text(noResultsMsg);
+                });
+
             });
 
-            if (!heading_appended) {
-                $("div.actionBar").each(function(){
-                    if ($(this).closest(".bootgrid-header").attr("id").includes("alias")) {
-                        $(this).parent().prepend($('<td id="heading-wrapper" class="col-sm-2 theading-text">{{ lang._('Aliases') }}</div>'));
-                        $(this).removeClass("col-sm-12");
-                        $(this).addClass("col-sm-10");
-                        heading_appended = true;
-                    }
-                });
-            }
-
         } else if (e.target.id == 'domain_overrides_tab') {
-            $("#grid-aliases-wrapper").hide();
             $("#grid-domains").bootgrid('destroy');
             let grid_domains = $("#grid-domains").UIBootgrid({
                 search:'/api/unbound/settings/searchDomainOverride/',
@@ -173,97 +192,114 @@ $( document ).ready(function() {
 </style>
 
 <ul class="nav nav-tabs" data-tabs="tabs" id="maintabs">
-    <li><a data-toggle="tab" href="#host_overrides" id="host_overrides_tab">{{ lang._('Host Overrides') }}</a></li>
+    <li role="presentation" class="dropdown">
+        <a data-toggle="dropdown" href="#" class="dropdown-toggle pull-right visible-lg-inline-block visible-md-inline-block visible-xs-inline-block visible-sm-inline-block" role="button">
+            <b><span class="caret"></span></b>
+        </a>
+        <a data-toggle="tab" onclick="$('#host_overrides_tab').click();" class="visible-lg-inline-block visible-md-inline-block visible-xs-inline-block visible-sm-inline-block" style="border-right:0px;"><b>{{ lang._('Host Overrides') }}</b></a>
+        <ul class="dropdown-menu" role="menu">
+            <li><a data-toggle="tab" href="#host_overrides" id="host_overrides_tab">{{ lang._('Host Overrides') }}</a></li>
+            <li><a data-toggle="tab" href="#aliases" id="aliases_tab">{{ lang._('Aliases') }}</a></li>
+        </ul>
+    </li>
     <li><a data-toggle="tab" href="#domain_overrides" id="domain_overrides_tab">{{ lang._('Domain Overrides') }}</a></li>
 </ul>
 <div class="tab-content content-box col-xs-12 __mb">
     <!-- host overrides -->
     <div id="host_overrides" class="tab-pane fade in active">
-        <table id="grid-hosts" class="table table-condensed table-hover table-striped" data-editDialog="DialogHostOverride" data-editAlert="OverrideChangeMessage">
+        <div class="table-responsive">
+            <table id="grid-hosts" class="table table-condensed table-hover table-striped" data-editDialog="DialogHostOverride" data-editAlert="OverrideChangeMessage">
+                <thead>
+                <tr>
+                    <th data-column-id="uuid" data-type="string" data-identifier="true" data-visible="false">{{ lang._('ID') }}</th>
+                    <th data-column-id="enabled" data-width="6em" data-type="string" data-formatter="rowtoggle">{{ lang._('Enabled') }}</th>
+                    <th data-column-id="hostname" data-type="string">{{ lang._('Host') }}</th>
+                    <th data-column-id="domain" data-type="string">{{ lang._('Domain') }}</th>
+                    <th data-column-id="rr" data-type="string">{{ lang._('Type') }}</th>
+                    <th data-column-id="server" data-type="string" data-formatter="mxformatter">{{ lang._('Value') }}</th>
+                    <th data-column-id="description" data-type="string">{{ lang._('Description') }}</th>
+                    <th data-column-id="commands" data-width="7em" data-formatter="commands" data-sortable="false">{{ lang._('Commands') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                </tbody>
+                <tfoot>
+                <tr>
+                    <td></td>
+                    <td>
+                        <button id="test" data-action="add" type="button" class="btn btn-xs btn-primary"><span class="fa fa-fw fa-plus"></span></button>
+                    </td>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div id="infosection" class="tab-content">
+            {{ lang._('Entries in this section override individual results from the forwarders.') }}
+            {{ lang._('Use these for changing DNS results or for adding custom DNS records.') }}
+            {{ lang._('Keep in mind that all resource record types (i.e. A, AAAA, MX, etc. records) of a specified host below are being overwritten.') }}
+        </div>
+    </div>
+    <!-- aliases -->
+    <div id="aliases" class="tab-pane fade in">
+        <div class="table-responsive">
+        <table id="grid-aliases" class="table table-condensed table-hover table-striped" data-editDialog="DialogHostAlias" data-editAlert="OverrideChangeMessage">
             <thead>
             <tr>
                 <th data-column-id="uuid" data-type="string" data-identifier="true" data-visible="false">{{ lang._('ID') }}</th>
                 <th data-column-id="enabled" data-width="6em" data-type="string" data-formatter="rowtoggle">{{ lang._('Enabled') }}</th>
                 <th data-column-id="hostname" data-type="string">{{ lang._('Host') }}</th>
                 <th data-column-id="domain" data-type="string">{{ lang._('Domain') }}</th>
-                <th data-column-id="rr" data-type="string">{{ lang._('Type') }}</th>
-                <th data-column-id="server" data-type="string" data-formatter="mxformatter">{{ lang._('Value') }}</th>
+                <th data-column-id="host" data-type="string" data-visible="false">{{ lang._('Override') }}</th>
                 <th data-column-id="description" data-type="string">{{ lang._('Description') }}</th>
-                <th data-column-id="commands" data-width="7em" data-formatter="commands" data-sortable="false">{{ lang._('Edit') }} | {{ lang._('Delete') }}</th>
+                <th data-column-id="commands" data-width="7em" data-formatter="commands" data-sortable="false">{{ lang._('Commands') }}</th>
             </tr>
             </thead>
             <tbody>
             </tbody>
-            <tfoot>
-            <tr>
-                <td></td>
-                <td>
-                    <button id="test" data-action="add" type="button" class="btn btn-xs btn-primary"><span class="fa fa-fw fa-plus"></span></button>
-                </td>
-            </tr>
-            </tfoot>
-        </table>
-        <div id="infosection" class="tab-content col-xs-12 __mb">
-            {{ lang._('Entries in this section override individual results from the forwarders.') }}
-            {{ lang._('Use these for changing DNS results or for adding custom DNS records.') }}
-            {{ lang._('Keep in mind that all resource record types (i.e. A, AAAA, MX, etc. records) of a specified host below are being overwritten.') }}
-        </div>
-    </div>
-    <!-- domain overrides -->
-    <div id="domain_overrides" class="tab-pane fade in">
-        <table id="grid-domains" class="table table-condensed table-hover table-striped table-responsive" data-editDialog="DialogDomainOverride" data-editAlert="OverrideChangeMessage">
-            <thead>
-            <tr>
-                <th data-column-id="uuid" data-type="string" data-identifier="true" data-visible="false">{{ lang._('ID') }}</th>
-                <th data-column-id="enabled" data-width="6em" data-type="string" data-formatter="rowtoggle">{{ lang._('Enabled') }}</th>
-                <th data-column-id="domain" data-type="string">{{ lang._('Domain') }}</th>
-                <th data-column-id="server" data-type="string">{{ lang._('IP') }}</th>
-                <th data-column-id="description" data-type="string">{{ lang._('Description') }}</th>
-                <th data-column-id="commands" data-width="7em" data-formatter="commands" data-sortable="false">{{ lang._('Edit') }} | {{ lang._('Delete') }}</th>
-            </tr>
-            </thead>
-            <tbody>
-            </tbody>
-            <tfoot>
+            <tfoot class="host_selected">
             <tr>
                 <td></td>
                 <td>
                     <button data-action="add" type="button" class="btn btn-xs btn-primary"><span class="fa fa-fw fa-plus"></span></button>
-                    <button data-action="deleteSelected" type="button" class="btn btn-xs btn-default"><span class="fa fa-fw fa-trash-o"></span></button>
+                    <button data-action="deleteSelected" type="button" class="btn btn-xs btn-default"><span class="fa fa-trash-o"></span></button>
                 </td>
             </tr>
             </tfoot>
         </table>
-        <div id="infosection" class="tab-content col-xs-12 __mb">
+        </div>
+    </div>
+
+    <!-- domain overrides -->
+    <div id="domain_overrides" class="tab-pane fade in">
+        <div class="table-responsive">
+            <table id="grid-domains" class="table table-condensed table-hover table-striped" data-editDialog="DialogDomainOverride" data-editAlert="OverrideChangeMessage">
+                <thead>
+                <tr>
+                    <th data-column-id="uuid" data-type="string" data-identifier="true" data-visible="false">{{ lang._('ID') }}</th>
+                    <th data-column-id="enabled" data-width="6em" data-type="string" data-formatter="rowtoggle">{{ lang._('Enabled') }}</th>
+                    <th data-column-id="domain" data-type="string">{{ lang._('Domain') }}</th>
+                    <th data-column-id="server" data-type="string">{{ lang._('IP') }}</th>
+                    <th data-column-id="description" data-type="string">{{ lang._('Description') }}</th>
+                    <th data-column-id="commands" data-width="7em" data-formatter="commands" data-sortable="false">{{ lang._('Commands') }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                </tbody>
+                <tfoot>
+                <tr>
+                    <td></td>
+                    <td>
+                        <button data-action="add" type="button" class="btn btn-xs btn-primary"><span class="fa fa-fw fa-plus"></span></button>
+                        <button data-action="deleteSelected" type="button" class="btn btn-xs btn-default"><span class="fa fa-fw fa-trash-o"></span></button>
+                    </td>
+                </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div id="infosection" class="tab-content">
             {{ lang._('Entries in this area override an entire domain by specifying an authoritative DNS server to be queried for that domain.') }}
         </div>
     </div>
-</div>
-<!-- aliases for host overrides -->
-<div class="tab-content content-box col-xs-12 __mb" id ="grid-aliases-wrapper">
-    <table id="grid-aliases" class="table table-condensed table-hover table-striped" data-editDialog="DialogHostAlias" data-editAlert="OverrideChangeMessage">
-        <thead>
-        <tr>
-            <th data-column-id="uuid" data-type="string" data-identifier="true"  data-visible="false">{{ lang._('ID') }}</th>
-            <th data-column-id="enabled" data-width="6em" data-type="string" data-formatter="rowtoggle">{{ lang._('Enabled') }}</th>
-            <th data-column-id="hostname" data-type="string">{{ lang._('Host') }}</th>
-            <th data-column-id="domain" data-type="string">{{ lang._('Domain') }}</th>
-            <th data-column-id="description" data-type="string">{{ lang._('Description') }}</th>
-            <th data-column-id="commands" data-width="7em" data-formatter="commands" data-sortable="false">{{ lang._('Commands') }}</th>
-        </tr>
-        </thead>
-        <tbody>
-        </tbody>
-        <tfoot class="host_selected">
-        <tr>
-            <td></td>
-            <td>
-                <button data-action="add" type="button" class="btn btn-xs btn-primary"><span class="fa fa-fw fa-plus"></span></button>
-                <button data-action="deleteSelected" type="button" class="btn btn-xs btn-default"><span class="fa fa-trash-o"></span></button>
-            </td>
-        </tr>
-        </tfoot>
-    </table>
 </div>
 <!-- reconfigure -->
 <div class="tab-content content-box col-xs-12 __mb">
