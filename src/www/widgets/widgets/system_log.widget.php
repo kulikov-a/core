@@ -108,7 +108,7 @@ $prios = array('Emergency', 'Alert', 'Critical', 'Error', 'Warning', 'Notice', '
       <tr>
         <td><?= gettext('Minimum severity:') ?></td>
         <td>
-          <select  name="systemlogseverity" id="severity_filter" data-title="<?=html_safe(gettext("Severity")); ?>" class="selectpicker" data-width="200px">
+          <select  name="systemlogseverity" id="severity_filter" data-title="<?=html_safe(gettext("Severity")); ?>" class="selectpicker_widget" data-width="200px">
             <?php foreach ($prios as $prio) {?>
             <option value="<?= html_safe($prio) ?>" <?php if ($systemlogseverity == $prio) { echo "selected=\"selected\"";}?>><?= html_safe(gettext($prio)) ?></option>
             <?php } ?>
