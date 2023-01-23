@@ -44,6 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if (!empty($_POST['systemlogseverity'])) {
+        $config['widgets']['systemlogseverity'] = $_POST['systemlogseverity'];
+    }
+
     if (count($input_errors) == 0) {
       $config['widgets']['systemlogentriesfilter'] = $_POST['systemlogentriesfilter'];
       write_config("System Log Widget settings saved");
@@ -61,6 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $systemlogEntriesToFetch = isset($config['widgets']['systemlogfiltercount']) ? $config['widgets']['systemlogfiltercount'] : 20;
 $systemlogupdateinterval = isset($config['widgets']['systemlogupdateinterval']) ? $config['widgets']['systemlogupdateinterval'] : 10;
+$systemlogseverity = isset($config['widgets']['systemlogseverity']) ? $config['widgets']['systemlogseverity'] : "Debug";
 $systemlogentriesfilter = isset($config['widgets']['systemlogentriesfilter']) ? $config['widgets']['systemlogentriesfilter'] : "";
 if (isset($_COOKIE['inputerrors'])) {
     foreach ($_COOKIE['inputerrors'] as $i => $value) {
@@ -68,6 +73,7 @@ if (isset($_COOKIE['inputerrors'])) {
         setcookie("inputerrors[$i]", "", time() - 3600);
     }
 }
+$prios = array('Emergency', 'Alert', 'Critical', 'Error', 'Warning', 'Notice', 'Informational', 'Debug');
 
 ?>
 
@@ -89,7 +95,7 @@ if (isset($_COOKIE['inputerrors'])) {
         </td>
       </tr>
       <tr>
-        <td><?= gettext('Update interval in seconds:') ?><t/d>
+        <td><?= gettext('Update interval in seconds:') ?></td>
         <td>
           <select id="systemlogentriesupdateinterval" name="systemlogentriesupdateinterval">
 <?php for ($i = 5; $i <= 30; $i++): ?>
@@ -100,7 +106,18 @@ if (isset($_COOKIE['inputerrors'])) {
         <td></td>
       </tr>
       <tr>
-        <td><?= gettext('Log query filter:') ?><t/d>
+        <td><?= gettext('Minimum severity:') ?></td>
+        <td>
+          <select  name="systemlogseverity" id="severity_filter" data-title="<?=html_safe(gettext("Severity")); ?>" class="selectpicker" data-width="200px">
+            <?php foreach ($prios as $prio) {?>
+            <option value="<?= html_safe($prio) ?>" <?php if ($systemlogseverity == $prio) { echo "selected=\"selected\"";}?>><?= html_safe(gettext($prio)) ?></option>
+            <?php } ?>
+          </select>
+        </td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><?= gettext('Log query filter:') ?></td>
         <td colspan="2">
          <input id="systemlogentriesfilter" name="systemlogentriesfilter" type="text" value="<?=$systemlogentriesfilter?>" placeholder="<?=$systemlogentriesfilter?>" />
         </td>
@@ -123,7 +140,7 @@ if (isset($_COOKIE['inputerrors'])) {
 
 <script>
 
-            function fetch_system_log(rowCount, refresh_interval_ms) {
+            function fetch_system_log(rowCount, refresh_interval_ms, requestSeverity) {
                 //it is more correct to pass the filter value to the function (without searching the value every time). but this method allows to "live" test the filter value before saving
                 let filterstring = "";
                 if ($("#systemlogentriesfilter").val()) {
@@ -131,7 +148,7 @@ if (isset($_COOKIE['inputerrors'])) {
                 }
                 $.ajax({
                     url: 'api/diagnostics/log/core/system',
-                    data: 'current=1&rowCount=' + rowCount + '&searchPhrase=' + filterstring,
+                    data: 'current=1&rowCount=' + rowCount + '&severity=' + requestSeverity +'&searchPhrase=' + filterstring,
                     type: 'POST'
                 })
                     .done(function (data, status) {
@@ -143,18 +160,18 @@ if (isset($_COOKIE['inputerrors'])) {
                                 system_log_tr += '<tr class="system_log_entry"><td style="text-align: center;"><?=html_safe(gettext("No matching results!")); ?></td></tr>';
                             } else {
                                 while ((entry = data.rows.shift())) {
-                                system_log_tr += '<tr class="system_log_entry"><td style="white-space: nowrap;">' + entry['timestamp'] + '<br>' + entry['process_name'].split('[')[0] + '</td><td>' + entry['line'] + '</td></tr>';
+                                system_log_tr += '<tr class="system_log_entry"><td style="white-space: nowrap;">' + entry['timestamp'] + '<br>[' + entry['severity'] + ']<br>' + entry['process_name'].split('[')[0] + '</td><td>' + entry['line'] + '</td></tr>';
                                 }
                             }
                         } else {
                             system_log_tr += '<tr class="system_log_entry"><td style="text-align: center;"><?=html_safe(gettext("An empty response from the server.")); ?></td></tr>';
                         }
                         $("#system_log_table tbody").append(system_log_tr);
-                        setTimeout(fetch_system_log, refresh_interval_ms, rowCount, refresh_interval_ms);
+                        setTimeout(fetch_system_log, refresh_interval_ms, rowCount, refresh_interval_ms, requestSeverity);
                     })
                     .fail(function (jqXHR, textStatus) {
                         console.log("Request failed: " + textStatus);
-                        setTimeout(fetch_system_log, refresh_interval_ms, rowCount, refresh_interval_ms);
+                        setTimeout(fetch_system_log, refresh_interval_ms, rowCount, refresh_interval_ms, requestSeverity);
                     })
             }
 
@@ -169,7 +186,12 @@ if (isset($_COOKIE['inputerrors'])) {
                     filterstring = $("#systemlogentriesfilter").val();
                     $('section#system_log').find('h3').append('&nbsp;&nbsp;filtered with "' + filterstring + '"');
                 }
-                fetch_system_log(rowCount, refresh_interval_ms);
+                severities = $('#severity_filter option').map(function(){
+                    return (this.value ? this.value : null);
+                }).get();
+                let selectedSeverity = $('#severity_filter').val();
+                let requestSeverity = severities.slice(0,severities.indexOf(selectedSeverity) + 1).join(',');
+                fetch_system_log(rowCount, refresh_interval_ms, requestSeverity);
             })
 
 </script>
