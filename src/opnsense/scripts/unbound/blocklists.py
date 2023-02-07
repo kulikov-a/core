@@ -43,8 +43,16 @@ def uri_reader(uri):
         'timeout': 5,
         'stream': True
     }
+    retry_plan = requests.packages.urllib3.util.retry.Retry(
+        total=4,
+        backoff_factor=2,
+    )
+    adapter = requests.adapters.HTTPAdapter(max_retries=retry_plan)
+    bl_req = requests.Session()
+    bl_req.mount("https://", adapter)
+    bl_req.mount("http://", adapter)
     try:
-        req = requests.get(**req_opts)
+        req = bl_req.get(**req_opts)
     except Exception as e:
         syslog.syslog(syslog.LOG_ERR,'blocklist download : unable to download file from %s (error : %s)' % (uri, e))
         return
