@@ -46,7 +46,8 @@ function webgui_configure_delayed()
 function webgui_configure_do($verbose = false, $interface = '')
 {
     global $config;
-
+    $i_id = uniqid('webgui_id_');
+    log_msg("{$i_id}: start webgui_configure_do", LOG_INFO);
     $interfaces = array();
     if (!empty($config['system']['webgui']['interfaces'])) {
         $interfaces = explode(',', $config['system']['webgui']['interfaces']);
@@ -111,11 +112,8 @@ function webgui_configure_do($verbose = false, $interface = '')
 
         $ca = ca_chain($cert);
     }
-
+    log_msg("{$i_id}: starting generate_config", LOG_INFO);
     webgui_generate_config($portarg, $crt, $key, $ca, $listeners);
-
-    /* only stop the frontend when the generation was successful */
-    killbypid('/var/run/lighty-webConfigurator.pid', 'TERM', true);
 
     /* flush Phalcon volt templates */
     foreach (glob('/usr/local/opnsense/mvc/app/cache/*.php') as $filename) {
@@ -123,6 +121,7 @@ function webgui_configure_do($verbose = false, $interface = '')
     }
 
     /* regenerate the php.ini files in case the setup has changed */
+    log_msg("{$i_id}: reload gui templates", LOG_INFO);
     configd_run('template reload OPNsense/WebGui');
 
     /* we need a marker file for development mode to ensure quick action */
@@ -136,9 +135,15 @@ function webgui_configure_do($verbose = false, $interface = '')
      * Force reloading all php-cgi children to
      * avoid hiccups with moved include files.
      */
-    killbyname('php-cgi', 'HUP');
+    log_msg("{$i_id}: php-cgi HUP skipped. realy need it? (lighty spawns FastCGI) (besides, it only kills one instance (and may kill captive portal?)?", LOG_INFO);
+    /* killbyname('php-cgi', 'HUP'); */
+
+    /* only stop the frontend in a last moment. */
+    log_msg("{$i_id}: config ready. TERM lighty", LOG_INFO);
+    killbypid('/var/run/lighty-webConfigurator.pid', 'TERM', true);
 
     /* start lighttpd */
+    log_msg("{$i_id}: start lighty (lighty will remove pid file of working instance if start fail because of 'can't bind'. thats not funny)", LOG_INFO);
     if (!count($listeners) || mwexec('/usr/local/sbin/lighttpd -f /var/etc/lighty-webConfigurator.conf')) {
         service_log("failed.\n", $verbose);
     } else {
@@ -217,6 +222,7 @@ EOD;
 ## where to send error/access-messages to
 server.syslog-facility = "daemon"
 server.errorlog-use-syslog="enable"
+server.breakagelog = "/var/log/lighttpd/breakage.log"
 
 EOD;
     }
