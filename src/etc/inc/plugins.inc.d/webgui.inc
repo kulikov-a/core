@@ -129,21 +129,41 @@ function webgui_configure_do($verbose = false, $interface = '')
         @touch('/var/run/development');
     }
 
-    /* stop the frontend when the generation was completed */
-    killbypid('/var/run/lighty-webConfigurator.pid', 'INT', true);
+    /* (re)start the frontend when the generation was completed
+     * Lock on config file to prevent restart racing */
+    $lc_p = fopen('/var/etc/lighty-webConfigurator.conf', 'r');
+    if (!flock($lc_p, LOCK_EX)) { # blocks until file locked; failure unexpected
+        fclose($lc_p);
+        return;
+    }
 
-    /*
-     * Force reloading all php-cgi children to
-     * avoid hiccups with moved include files.
-     */
-    killbyname('php-cgi', 'HUP');
-
+    $gui_pid = '/var/run/lighty-webConfigurator.pid';
+    if (isvalidpid($gui_pid)) {
+        $last_version = @file_get_contents('/var/run/lighty_gui.version');
+        $this_version = shell_safe('/usr/local/sbin/lighttpd -v | sha256');
+        file_put_contents('/var/run/lighty_gui.version', $this_version);
+        if ($last_version == $this_version) {
+            killbypid($gui_pid, 'USR1', false);
+            flock($lc_p, LOCK_UN);
+            fclose($lc_p);
+            return;
+        } else {
+            /* lighttpd updated. need to stop.
+             * adjust config to change server.graceful-shutdown-timeout
+             * value (default is 8. now 2) */
+            killbypid($gui_pid, 'INT', true);
+        }
+    }
+ 
     /* start lighttpd */
     if (!count($listeners) || mwexec('/usr/local/sbin/lighttpd -f /var/etc/lighty-webConfigurator.conf')) {
         service_log("failed.\n", $verbose);
     } else {
         service_log("done.\n", $verbose);
     }
+
+    flock($lc_p, LOCK_UN);
+    fclose($lc_p);
 }
 
 function webgui_create_selfsigned($verbose = false)
