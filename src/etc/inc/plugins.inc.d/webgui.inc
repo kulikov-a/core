@@ -106,6 +106,9 @@ function webgui_configure_do($verbose = false, $interface = '')
         $ca = ca_chain($cert);
     }
 
+    /* Use gui lock to not allow concurrent gui reloads during this run. */
+    $guilck = lock('webgui', LOCK_EX);
+
     webgui_generate_config($portarg, $crt, $key, $ca, $listeners);
 
     /* regenerate the php.ini files in case the setup has changed */
@@ -132,6 +135,7 @@ function webgui_configure_do($verbose = false, $interface = '')
     } else {
         service_log("done.\n", $verbose);
     }
+    unlock($guilck);
 }
 
 function webgui_create_selfsigned($verbose = false)
