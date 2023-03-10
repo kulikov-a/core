@@ -96,6 +96,9 @@ $pagetitle .= html_safe(sprintf(' | %s.%s', $config['system']['hostname'], $conf
     <!-- datepicker css -->
     <link rel="stylesheet" type="text/css" href="<?= cache_safe(get_themed_filename("/css/bootstrap-datepicker3.min.css")) ?>">
 
+    <!-- gridstack -->
+    <link rel="stylesheet" type="text/css" href="<?= cache_safe(get_themed_filename("/css/gridstack.min.css")) ?>">
+
     <!-- JQuery -->
     <script src="/ui/js/jquery-3.5.1.min.js"></script>
 

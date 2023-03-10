@@ -48,13 +48,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         $widgetItem['display_name'] = ucwords(str_replace("_", " ", $widgetItem['name']));
         $widgetItem['filename'] = $php_file;
         $widgetItem['state'] = "none";
+        $widgetItem['x'] = "0";
+        $widgetItem['y'] = "0";
+        $widgetItem['w'] = "1";
+        $widgetItem['h'] = "1";
         /// default sort order
         $widgetItem['sortKey'] = $widgetItem['name'] == 'system_information' ? "00000000" : "99999999" . $widgetItem['name'];
         foreach ($widgetSeqParts as $seqPart) {
             $tmp = explode(':', $seqPart);
-            if (count($tmp) == 3 && explode('-', $tmp[0])[0] == $widgetItem['name']) {
+            if (count($tmp) == 7 && explode('-', $tmp[0])[0] == $widgetItem['name']) {
                 $widgetItem['state'] = $tmp[2];
                 $widgetItem['sortKey'] = $tmp[1];
+                $widgetItem['x'] = $tmp[3];
+                $widgetItem['y'] = $tmp[4];
+                $widgetItem['w'] = $tmp[5];
+                $widgetItem['h'] = $tmp[6];
             }
         }
         $widgetCollection[] = $widgetItem;
@@ -84,10 +92,34 @@ foreach (glob("/usr/local/www/widgets/include/*.inc") as $filename) {
     include($filename);
 }
 
-$product = product::getInstance();
-
 include("head.inc");
 ?>
+<style>
+.gridwidgetdiv {
+    /* display: block; */
+    /* inset: 10px; */
+    background: #e8e8e8;
+    height: 100%;
+}
+.gridwidgetdiv .content-box-head {
+    background: #E8E8E8 !important;
+    color: #3C3C3B !important;
+    padding-bottom: 1px !important;
+    padding-top: 1px !important;
+    padding-right: 1px !important;
+    padding-left: 5px !important;
+    min-height: 25px !important;
+}
+.gridwidgetdiv .content-box-head .btn-group .btn {
+    color: #3C3C3B !important;
+    background: #E8E8E8 !important;
+    border: 0px;
+}
+.gridwidgetdiv {
+    overflow: hidden;
+}
+</style>
+
 <body>
 <?php
 include("fbegin.inc");?>
@@ -158,6 +190,7 @@ include("fbegin.inc");?>
   else:?>
 
 <script src="<?= cache_safe('/ui/js/jquery-sortable.js') ?>"></script>
+<script src="<?= cache_safe('/ui/js/gridstack-h5.js') ?>"></script>
 <script>
   function addWidget(selectedDiv) {
       $('#'+selectedDiv).show();
@@ -204,13 +237,15 @@ include("fbegin.inc");?>
   function updatePref() {
       var widgetInfo = [];
       var index = 0;
-      $('.widgetdiv').each(function(key) {
+      $('.gridwidgetdiv').each(function(key) {
           if ($(this).is(':visible')) {
               // only capture visible widgets
               var index_str = "0000000" + index;
               index_str = index_str.substr(index_str.length-8);
-              let col_index = $(this).parent().attr("id").split('_')[1];
-              widgetInfo.push($(this).attr('id')+'-container:'+index_str+'-'+col_index+':'+$('input[name='+$(this).attr('id')+'-config]').val());
+              let col_index = $(this).attr("id").split('_')[1];
+              let g_item = $(this).parents('.grid-stack-item');
+              let grid_data = ':'+g_item.attr('gs-x')+':'+g_item.attr('gs-y')+':'+g_item.attr('gs-w')+':'+g_item.attr('gs-h');
+              widgetInfo.push($(this).attr('id')+'-container:'+index_str+'-'+col_index+':'+$('input[name='+$(this).attr('id')+'-config]').val()+grid_data);
               index++;
           }
       });
@@ -251,25 +286,62 @@ include("fbegin.inc");?>
             setTimeout('process_widget_data()', 5000);
       });
   }
+  function adjust_grid()
+  {
+      let widgets = grid.getGridItems();
+      $.each(widgets, function(i) {
+     // let currHeight = $(this).attr("gs-h");
+          let contentHeight = $(this).find('.content-box')[0].scrollHeight;
+          let newHeight = Math.ceil((contentHeight + 2*grid.opts.margin)/(grid.opts.cellHeight));
+          grid.update(this, {h: newHeight});
+      });
+
+      var canvas = document.querySelectorAll('canvas');
+      canvas.forEach(elem => {
+          //elem.style.width ='100%';
+          //elem.style.height='100%';
+          //elem.width  = canvas.offsetWidth;
+          //elem.height = canvas.offsetHeight;
+      })
+
+      //grid.compact();
+      //$.each(widgets, function(i) {
+      //    grid.update(this, {locked: false});
+      //});
+
+  }
+
+  function adjust_cell(el)
+  {
+      let contentHeight = $(el).find('.content-box')[0].scrollHeight;
+      let newHeight = Math.ceil((contentHeight + 2*grid.opts.margin)/(grid.opts.cellHeight));
+      grid.update(el, {h: newHeight});
+  }
+
 </script>
 
 <script>
+  var grid;
   $( document ).ready(function() {
       // rearrange widgets to stored column
-      $(".widgetdiv").each(function(){
+      $(".gridwidgetdiv").each(function(){
           var widget = $(this);
           widget.find('script').each(function(){
               $(this).remove();
           });
-          var container = $(this).parent();
+          //var container = $(this).parent();
           var target_col = widget.data('sortkey').split('-')[1];
-          if (target_col != undefined) {
-              if (container.attr('id').split('_')[1] != target_col) {
-                  widget.remove().appendTo("#dashboard_"+target_col);
-              }
-          } else {
-              // dashboard_colx (source) is not visible, move other items to col4
-              widget.remove().appendTo("#dashboard_col4");
+          //if (target_col != undefined) {
+          //    if (container.attr('id').split('_')[1] != target_col) {
+          //        widget.remove().appendTo("#dashboard_"+target_col);
+          //    }
+          //} else {
+          //    // dashboard_colx (source) is not visible, move other items to col4
+          //    widget.remove().appendTo("#dashboard_col4");
+          //}
+          if (typeof target_col === "undefined") {
+                widget.parent().addClass("NOT-grid-stack-item-content").removeClass("grid-stack-item-content");
+                widget.parent().parent().addClass("NOT-grid-stack-item").removeClass("grid-stack-item");
           }
       });
 
@@ -280,16 +352,16 @@ include("fbegin.inc");?>
       $("#dashboard_container").trigger("WidgetsReady");
 
       // sortable widgets
-      $(".dashboard_grid_column").sortable({
-        handle: '.widget-sort-handle',
-        group: 'dashboard_grid_column',
-        itemSelector: '.widgetdiv',
-        containerSelector: '.dashboard_grid_column',
-        placeholder: '<div class="placeholder"><i class="fa fa-hand-o-right" aria-hidden="true"></i></div>',
-        afterMove: function (placeholder, container, closestItemOrContainer) {
-            showSave();
-        }
-      });
+//      $(".dashboard_grid_column").sortable({
+//        handle: '.widget-sort-handle',
+//        group: 'dashboard_grid_column',
+//        itemSelector: '.widgetdiv',
+//        containerSelector: '.dashboard_grid_column',
+//        placeholder: '<div class="placeholder"><i class="fa fa-hand-o-right" aria-hidden="true"></i></div>',
+//        afterMove: function (placeholder, container, closestItemOrContainer) {
+//            showSave();
+//        }
+//      });
 
       // select number of columns
       $("#column_count").change(function(){
@@ -307,13 +379,13 @@ include("fbegin.inc");?>
               widget_col.addClass('col-md-'+(12 / $("#column_count_input").val()));
           });
       });
-      $("#column_count").change();
+//      $("#column_count").change();
       // trigger initial ajax data poller
       process_widget_data();
 
       // in "Add Widget" dialog, hide widgets already on screen
       $("#add_widget_btn").click(function(){
-          $(".widgetdiv").each(function(widget){
+          $(".gridwidgetdiv").each(function(widget){
               if ($(this).is(':visible')) {
                   $("#add_widget_" + $(this).attr('id')).hide();
               } else {
@@ -321,8 +393,49 @@ include("fbegin.inc");?>
               }
           });
       });
+
+      // unlock grid on button
+      $("#unlock_grid_btn").click(function(){
+          showSave();
+          if (grid.opts.disableDrag) {
+              grid.enable();
+              $(this).children("i").removeClass("fa-lock").addClass("fa-unlock-alt");
+          } else {
+              grid.disable();
+              $(this).children("i").removeClass("fa-unlock-alt").addClass("fa-lock");
+          }
+      });
+
+
       $('.selectpicker_widget').selectpicker('refresh');
-  });
+      grid = GridStack.init({cellHeight:15, float:false, resizable: {handles: "all"}});
+      grid.disable();
+      grid.on('resizestop', function(e, el) {
+        adjust_cell(el);
+      });
+      //adjust_grid();
+//
+
+//
+      //adjust_grid();
+      //$( document ).ajaxComplete(function() {
+         // adjust_grid();
+      //});
+
+
+  })
+  $( window ).on("load", function() {
+    const resizeObserver = new ResizeObserver((entries) => {
+        adjust_grid();
+        //grid.compact();
+    });
+    const content_boxes = document.querySelectorAll('.content-box');
+    content_boxes.forEach(box => {
+        resizeObserver.observe(box);
+    });
+    //resizeObserver.observe(document.querySelector('.content-box'));
+
+  })
 </script>
 
 <section class="page-content-main">
@@ -334,12 +447,11 @@ include("fbegin.inc");?>
     <div class="container-fluid">
       <div class="row">
         <div class="col-md-12 col-xs-12">
-          <?php print_service_banner('bootup') ?>
           <?php print_service_banner('livecd') ?>
         </div>
       </div>
-      <div id="dashboard_container" class="row" style="display:none">
-        <div class="col-xs-12 col-md-2 dashboard_grid_column hidden" id="dashboard_colx">
+      <div id="dashboard_container" style="display:none">
+        <div class="grid-stack">
 
 <?php
       foreach ($widgetCollection as $widgetItem):
@@ -371,7 +483,9 @@ include("fbegin.inc");?>
                   $mindiv = "inline";
                   break;
           }?>
-          <section class="widgetdiv" data-sortkey="<?=$widgetItem['sortKey'] ?>" id="<?=$widgetItem['name'];?>"  style="display:<?=$divdisplay;?>;">
+  <div class="grid-stack-item" gs-min-w="3" gs-min-h="5"  gs-x="<?=$widgetItem['x'];?>" gs-y="<?=$widgetItem['y'];?>"  gs-w="<?=$widgetItem['w'];?>"  gs-h="<?=$widgetItem['h'];?>" >
+    <div class="grid-stack-item-content">
+          <div class="gridwidgetdiv" data-sortkey="<?=$widgetItem['sortKey'] ?>" id="<?=$widgetItem['name'];?>" style="display:<?=$divdisplay;?>;">
             <div class="content-box">
               <header class="content-box-head container-fluid">
                 <ul class="list-inline __nomb">
@@ -414,7 +528,9 @@ include("fbegin.inc");?>
 ?>
               </div>
             </div>
-          </section>
+          </div>
+        </div>
+      </div>
 <?php
           endforeach;?>
           </div>

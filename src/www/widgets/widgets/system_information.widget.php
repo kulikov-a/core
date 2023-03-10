@@ -262,8 +262,8 @@ require_once("system.inc");
               <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%; z-index: 0;"></div>
               <span class="state_text" style="position:absolute;right:0;left:0;"></span>
             </div>
-            <div style="height:1px;">
-            </div>
+           <!-- <div style="height:1px;">
+            </div> -->
           </div>
           <div class="swap_devices">
           </div>
@@ -278,8 +278,8 @@ require_once("system.inc");
               <div class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%; z-index: 0;"></div>
               <span class="state_text" style="position:absolute;right:0;left:0;"></span>
             </div>
-            <div style="height:1px;">
-            </div>
+            <!--<div style="height:1px;">
+            </div>-->
           </div>
           <div class="disk_devices">
           </div>
