@@ -47,6 +47,7 @@
  # width       :   width in pixels if applicable
  # allownew    :   allow new items (for list) if applicable
  # readonly    :   if true, input fields will be readonly
+ # param       :   corresponding config file option if applicable
  #}
 
 <tr id="row_{{ id }}" {% if advanced|default(false)=='true' %} data-advanced="true"{% endif %}>
@@ -99,9 +100,14 @@
         {% elseif type == "info" %}
             <span  class="{{style|default('')}}" id="{{ id }}"></span>
         {% endif %}
-        {% if help|default(false) %}
+        {% if help|default(false) or option|default(false) %}
             <div class="hidden" data-for="help_for_{{ id }}">
+                {% if option|default(false) %}
+                <small>{{ lang._('Config Option') }}: <i>{{ option }}</i></small><br>
+                {% endif %}
+                {% if help|default(false) %}
                 <small>{{help}}</small>
+                {% endif %}
             </div>
         {% endif %}
     </td>
