@@ -381,9 +381,37 @@ function unbound_match_interface($interface)
     return false;
 }
 
+/* lock configuration file */
+function unbound_lock($lock = 'unbound', $op = LOCK_EX)
+{
+    if (!file_exists("{/tmp/{$lock}.lock")) {
+        @touch("/tmp/{$lock}.lock");
+        @chmod("/tmp/{$lock}.lock", 0666);
+    }
+
+    if ($fp = fopen("/tmp/{$lock}.lock", 'a+e')) {
+        if (flock($fp, $op)) {
+            return $fp;
+        } else {
+            fclose($fp);
+        }
+    }
+}
+
+/* unlock configuration file */
+function unbound_unlock($fp)
+{
+    flock($fp, LOCK_UN);
+    fclose($fp);
+}
+
 function unbound_configure_do($verbose = false, $interface = null)
 {
     global $config;
+
+    openlog('unbound', LOG_DAEMON, LOG_LOCAL4);
+    $i_id = uniqid('reload_id_');
+    syslog(LOG_DEBUG, "RACE DEBUG. {$i_id}: starting CONFIGURE procedure");
 
     $mdl = new \OPNsense\Unbound\Unbound();
 
@@ -392,13 +420,22 @@ function unbound_configure_do($verbose = false, $interface = null)
         return;
     }
 
+    syslog(LOG_DEBUG, "RACE DEBUG. {$i_id}: Ready to STOP unbound ");
+    /* Use lock to not allow concurrent unbound reloads. */
+    $lock = unbound_lock();
+
+    syslog(LOG_DEBUG, "RACE DEBUG. {$i_id}: STOPPING unbound gracefully");
     unbound_service_stop();
 
     if (!unbound_enabled()) {
         return;
     }
 
+    syslog(LOG_DEBUG, "RACE DEBUG. {$i_id}: Starting GENERATE config");
     service_log('Starting Unbound DNS...', $verbose);
+
+    closelog();
+    reopenlog();
 
     unbound_generate_config();
 
@@ -416,11 +453,20 @@ function unbound_configure_do($verbose = false, $interface = null)
         @unlink('/var/unbound/data/stats');
     }
 
+    openlog('unbound', LOG_DAEMON, LOG_LOCAL4);
+    syslog(LOG_DEBUG, "RACE DEBUG. {$i_id}: START unbound");
     mwexecf_bg('/usr/local/bin/flock -n -E 0 -o /tmp/unbound_start.lock /usr/local/opnsense/scripts/unbound/start.sh %s', [$domain]);
 
-    waitforpid('/var/run/unbound.pid', 10);
+    $new_pid = waitforpid('/var/run/unbound.pid', 10);
 
     service_log("done.\n", $verbose);
+
+    syslog(LOG_DEBUG, "RACE DEBUG. {$i_id}: UNBOUND STARTED with the {$new_pid} PID");
+
+    closelog();
+    reopenlog();
+
+    unbound_unlock($lock);
 }
 
 function unbound_add_host_entries($ifconfig_details)
