@@ -229,7 +229,7 @@ function handleFormValidation(parent, validationErrors)
             target.addClass("has-error");
             /* make sure to always unhide row when triggering a validation */
             if (!target.closest('tr').is(':visible')) {
-                target.closest('tr').show();
+                target.closest('tr').removeClass("hidden").show();
             }
             /* scroll to element with validation issue */
             target[0].scrollIntoView();
