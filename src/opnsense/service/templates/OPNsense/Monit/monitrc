@@ -28,7 +28,9 @@ set httpd unixsocket /var/run/monit.sock
 {%  endif %}
 
 set daemon {{ OPNsense.monit.general.interval }} with start delay {{ OPNsense.monit.general.startdelay }}
-
+SET LIMITS {
+   FILECONTENTBUFFER: 1 MB
+}
 {%  if helpers.exists('OPNsense.monit.general.logfile') and OPNsense.monit.general.logfile|default('') != '' %}
 set logfile {{ OPNsense.monit.general.logfile }}
 {%  else %}
